@@ -294,6 +294,10 @@ tr.msj-noleido{font-weight:700}
 @media(max-width:640px){.disc-macrobar{grid-template-columns:1fr}.disc-macro-btn{text-align:center}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+.ss-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.ss-card{border:1px solid var(--line,#d9e1e8);border-radius:12px;padding:14px;background:#fff}.ss-card h3{margin:0 0 8px;color:var(--blue,#185FA5);font-size:15px}.mini-evidencia{border-left:3px solid var(--teal,#1f8a70);padding:8px 10px;margin:7px 0;background:#f7faf9;border-radius:0 8px 8px 0;font-size:12.5px}.formativo-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}@media(max-width:760px){.ss-grid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 
@@ -431,6 +435,8 @@ tr.msj-noleido{font-weight:700}
       <div class="subtabs no-print">
         <button class="on" data-obtab="grupal" onclick="obsTab('grupal')">🏠 Grupal</button>
         <button data-obtab="individual" onclick="obsTab('individual')">🧾 Individual</button>
+        <button data-obtab="saber-ser" onclick="obsTab('saber-ser')">🌱 Saber Ser</button>
+        <button data-obtab="efc" onclick="obsTab('efc')">🎯 EFC</button>
       </div>
 
       <!-- ====== GRUPAL: panorama, casos pendientes, reconocimientos, comparativo entre cursos ====== -->
@@ -459,7 +465,7 @@ tr.msj-noleido{font-weight:700}
 
         <div class="card-block">
           <h2>Reconocimientos</h2>
-          <div class="help-box"><span>💡</span><span>Aspectos positivos del estudiante — Estímulos del Pacto Guadalupano (13 categorías, incluye talento artístico, deporte e inteligencia emocional).</span></div>
+          <div class="help-box"><span>💡</span><span>Registro positivo institucional conectado a Supabase. Los reconocimientos pueden aportar evidencia al Saber Ser, pero no determinan automáticamente una valoración.</span></div>
           <div id="statsReconocimientos" class="statbar"></div>
           <div class="searchbar"><select id="fRecCategoria" onchange="recRenderLista()"><option value="">Todas las categorías</option></select></div>
           <div style="overflow-x:auto"><table class="datatable"><thead><tr><th>Fecha</th><th>Estudiante</th><th>Categoría</th><th>Conducta</th><th>Estímulo</th><th>Registrado por</th></tr></thead><tbody id="tblReconocimientos"></tbody></table></div>
@@ -494,6 +500,32 @@ tr.msj-noleido{font-weight:700}
         <div class="card-block" id="detalleConvivenciaWrap" style="display:none"></div>
         <div class="card-block" id="detalleAdministrativoWrap" style="display:none"></div>
         <div class="card-block" id="detalleOrientacionWrap" style="display:none"></div>
+      </div>
+
+      <!-- ====== SABER SER: valoración formativa transversal, no sancionatoria ====== -->
+      <div class="obs-panel" id="obs-saber-ser">
+        <div class="card-block">
+          <h2>🌱 Saber Ser · Valoración Formativa</h2>
+          <div class="help-box"><span>💡</span><span><b>Dimensiones institucionales D1-D4.</b> Esta valoración integra evidencias y fortalezas; no equivale a una falta ni genera sanciones automáticas.</span></div>
+          <div class="row2">
+            <div class="field"><label>Curso</label><select id="ssCurso"></select></div>
+            <div class="field"><label>Estudiante</label><select id="ssEstudiante"></select></div>
+          </div>
+          <div class="field"><label>Período académico</label><select id="ssPeriodo" onchange="saberSerCargarSeleccion()"></select></div>
+          <div class="field-hint" id="ssRolHint"></div>
+        </div>
+        <div class="card-block" id="ssContenido"><div class="inbox-empty">Seleccione curso, estudiante y período.</div></div>
+      </div>
+
+      <!-- ====== EFC: componente formativo transversal, no quinto motor ====== -->
+      <div class="obs-panel" id="obs-efc">
+        <div class="card-block">
+          <h2>🎯 Espacio de Formación Comportamental (EFC) <button class="btn btn-sm btn-ghost no-print" onclick="efcCargarLista()">🔄 Actualizar</button> <button class="btn btn-sm btn-primary no-print" onclick="efcAbrirNuevaRemision()">+ Nueva remisión</button></h2>
+          <div class="help-box"><span>🧭</span><span>Componente pedagógico vinculado a procesos de <b>Disciplina</b> o <b>Convivencia</b>. Maneja entre 1 y 5 sesiones según la situación y la evolución observable. No convierte automáticamente un proceso en Tipo II ni abre sanciones por sí mismo.</span></div>
+          <div id="efcStats" class="statbar"></div>
+          <div class="searchbar"><select id="efcFiltroEstado" onchange="efcCargarLista()"><option value="">Todos los estados</option><option value="BORRADOR">Borrador</option><option value="PENDIENTE_CONCEPTO_ORIENTACION">Pendiente concepto Orientación</option><option value="PROGRAMADA">Programada</option><option value="EN_CURSO">En curso</option><option value="REQUIERE_NUEVA_VALORACION">Requiere nueva valoración</option><option value="CERRADA">Cerrada</option><option value="CANCELADA">Cancelada</option></select></div>
+          <div style="overflow-x:auto"><table class="datatable"><thead><tr><th>Fecha</th><th>Estudiante</th><th>Origen</th><th>Dimensión</th><th>Sesiones</th><th>Estado</th><th></th></tr></thead><tbody id="efcTabla"><tr><td colspan="7" class="field-hint">Abra EFC para cargar los procesos visibles.</td></tr></tbody></table></div>
+        </div>
       </div>
 
       <!-- ====== ACADÉMICO: motor interno sin pestaña superior.
@@ -795,14 +827,17 @@ tr.msj-noleido{font-weight:700}
 
         <div class="section-title" style="margin-top:26px">Cuentas institucionales · Activación del personal</div>
         <div class="help-box"><span>🔐</span><span>Solo Rectoría o Administración Técnica. Las invitaciones se generan únicamente para personal previamente autorizado en Supabase con correo y documento confirmados. Primero use <b>Revisar pendientes</b>; el envío requiere una segunda confirmación explícita.</span></div>
-        <div class="row2">
-          <div class="field"><label>URL de retorno después de aceptar la invitación <span class="field-hint">(opcional)</span></label><input id="cfgAuthRedirect" placeholder="https://su-dominio-institucional/..."></div>
-          <div class="field"><label>Límite por lote</label><select id="cfgAuthLimit"><option>5</option><option>10</option><option>20</option><option selected>40</option></select></div>
+        <div class="field">
+          <label>URL de retorno después de aceptar la invitación <span class="field-hint">(opcional)</span></label>
+          <input id="cfgAuthRedirect" placeholder="https://su-dominio-institucional/...">
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="sigiAuthRevisarPendientes()">🔎 Revisar pendientes</button>
-          <button class="btn btn-primary btn-sm" id="btnAuthEnviarInvitaciones" onclick="sigiAuthEnviarInvitaciones()" disabled>✉️ Enviar invitaciones</button>
+        <div class="help-box"><span>👥</span><span><b>Selección manual obligatoria.</b> Primero cargue el personal elegible y luego elija exactamente a quién desea invitar. El lote piloto admite entre 1 y 5 personas. El sistema no escogerá usuarios automáticamente.</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-ghost btn-sm" onclick="sigiAuthRevisarPendientes()">🔎 Cargar personal elegible</button>
+          <button class="btn btn-ghost btn-sm" id="btnAuthValidarSeleccion" onclick="sigiAuthValidarSeleccion()" disabled>✅ Validar selección</button>
+          <button class="btn btn-primary btn-sm" id="btnAuthEnviarInvitaciones" onclick="sigiAuthEnviarInvitaciones()" disabled>✉️ Enviar a seleccionados</button>
         </div>
+        <div id="sigiAuthSelectorPersonal"></div>
         <div id="sigiAuthInvitacionesEstado" class="field-hint" style="margin-top:8px"></div>
         <div class="section-title" style="margin-top:26px">¿Quién puede ver el Catálogo Documental en Portada?</div>
         <div id="cfgCatalogoRoles"></div>
@@ -1889,13 +1924,16 @@ function sincronizarBasesAlInicio(){
   fetchSheets('DirectoresGrupo', function(d){ if(d && d.length){ DIRECTORES_GRUPO=d; LS.set('iem_directores_grupo', JSON.stringify(d)); } });
 }
 
-async function sigiAuthInvocarInvitaciones(execute){
+var SIGI_AUTH_CANDIDATOS=[];
+var SIGI_AUTH_SELECCION_VALIDADA=[];
+
+async function sigiAuthInvocarInvitaciones(execute, personalIds){
   if(!(tieneRol && tieneRol('rector,admin'))) throw new Error('Solo Rectoría o Administración Técnica pueden gestionar cuentas.');
   var estado=document.getElementById('sigiAuthInvitacionesEstado');
-  var limit=Number((document.getElementById('cfgAuthLimit')||{}).value||40);
   var redirect=String((document.getElementById('cfgAuthRedirect')||{}).value||'').trim();
-  if(estado) estado.textContent=execute?'Enviando invitaciones...':'Consultando personal autorizado...';
-  var body={execute:!!execute,limit:limit};
+  if(estado) estado.textContent=execute?'Enviando invitaciones seleccionadas...':'Consultando personal autorizado...';
+  var body={execute:!!execute};
+  if(Array.isArray(personalIds) && personalIds.length) body.personal_ids=personalIds.slice();
   if(redirect) body.redirect_to=redirect;
   var resp=await sb.functions.invoke('admin-invitar-personal-sigi',{body:body});
   if(resp.error) throw resp.error;
@@ -1903,13 +1941,59 @@ async function sigiAuthInvocarInvitaciones(execute){
   return resp.data;
 }
 
+function sigiAuthSeleccionActual(){
+  return sigiMultiValues('cfgAuthPersonalSeleccion');
+}
+
+function sigiAuthCambioSeleccion(){
+  var ids=sigiAuthSeleccionActual();
+  var validar=document.getElementById('btnAuthValidarSeleccion');
+  var enviar=document.getElementById('btnAuthEnviarInvitaciones');
+  var estado=document.getElementById('sigiAuthInvitacionesEstado');
+
+  SIGI_AUTH_SELECCION_VALIDADA=[];
+  if(enviar) enviar.disabled=true;
+  if(validar) validar.disabled=(ids.length<1 || ids.length>5);
+
+  if(estado){
+    if(ids.length===0) estado.innerHTML='Seleccione entre <b>1 y 5 personas</b> para el lote piloto.';
+    else if(ids.length>5) estado.innerHTML='<span style="color:#a33"><b>Selección excedida:</b> ha elegido '+ids.length+'. El máximo permitido es 5. Quite '+(ids.length-5)+' persona(s).</span>';
+    else estado.innerHTML='<b>'+ids.length+' persona(s) seleccionada(s).</b> Pulse “Validar selección” antes de enviar.';
+  }
+}
+
 async function sigiAuthRevisarPendientes(){
   try{
-    var d=await sigiAuthInvocarInvitaciones(false);
+    var d=await sigiAuthInvocarInvitaciones(false,[]);
+    SIGI_AUTH_CANDIDATOS=Array.isArray(d.candidates)?d.candidates:[];
+    SIGI_AUTH_SELECCION_VALIDADA=[];
+
+    var host=document.getElementById('sigiAuthSelectorPersonal');
+    var validar=document.getElementById('btnAuthValidarSeleccion');
+    var enviar=document.getElementById('btnAuthEnviarInvitaciones');
+    if(validar) validar.disabled=true;
+    if(enviar) enviar.disabled=true;
+
+    if(host){
+      if(!SIGI_AUTH_CANDIDATOS.length){
+        host.innerHTML='<div class="empty"><div class="ico">👤</div><p>No hay personal elegible pendiente de invitación.</p></div>';
+      }else{
+        var opciones=SIGI_AUTH_CANDIDATOS.map(function(p){
+          return {
+            value:p.personal_id,
+            label:String(p.nombre_completo||'Sin nombre')+' · '+String(p.correo||'Sin correo')+' · '+String(p.rol_funcional||'')
+          };
+        });
+        host.innerHTML='<div class="field"><label>Personal elegible para invitación</label>'+
+          sigiRenderMultiSelect('cfgAuthPersonalSeleccion',opciones,[],{
+            hint:'Haga clic para seleccionar. Puede buscar por nombre o correo. Máximo 5 personas por lote piloto.',
+            onchange:'sigiAuthCambioSeleccion()'
+          })+'</div>';
+      }
+    }
+
     var estado=document.getElementById('sigiAuthInvitacionesEstado');
-    var btn=document.getElementById('btnAuthEnviarInvitaciones');
-    if(estado) estado.innerHTML='<b>Vista previa:</b> '+Number(d.eligible||0)+' cuenta(s) autorizada(s) lista(s) para invitación. No se envió ningún correo.';
-    if(btn) btn.disabled=Number(d.eligible||0)===0;
+    if(estado) estado.innerHTML='<b>'+Number(d.eligible||0)+' persona(s) elegible(s).</b> No se envió ningún correo. Seleccione manualmente entre 1 y 5.';
   }catch(e){
     var estado=document.getElementById('sigiAuthInvitacionesEstado');
     if(estado) estado.textContent='Error: '+(e.message||String(e));
@@ -1917,19 +2001,58 @@ async function sigiAuthRevisarPendientes(){
   }
 }
 
+async function sigiAuthValidarSeleccion(){
+  var ids=sigiAuthSeleccionActual();
+  if(ids.length<1 || ids.length>5){
+    toast('Seleccione entre 1 y 5 personas.','error');
+    return;
+  }
+  try{
+    var d=await sigiAuthInvocarInvitaciones(false,ids);
+    var seleccion=Array.isArray(d.selected)?d.selected:[];
+    if(seleccion.length!==ids.length) throw new Error('La selección cambió durante la validación. Revise nuevamente.');
+
+    SIGI_AUTH_SELECCION_VALIDADA=ids.slice().sort();
+    var btn=document.getElementById('btnAuthEnviarInvitaciones');
+    if(btn) btn.disabled=false;
+
+    var estado=document.getElementById('sigiAuthInvitacionesEstado');
+    if(estado) estado.innerHTML='<b>Selección validada:</b> '+seleccion.length+' persona(s). No se envió ningún correo. Ahora puede usar “Enviar a seleccionados”.';
+    toast('Selección validada.','success');
+  }catch(e){
+    SIGI_AUTH_SELECCION_VALIDADA=[];
+    var btn=document.getElementById('btnAuthEnviarInvitaciones');
+    if(btn) btn.disabled=true;
+    var estado=document.getElementById('sigiAuthInvitacionesEstado');
+    if(estado) estado.textContent='Error de validación: '+(e.message||String(e));
+    toast(e.message||String(e),'error');
+  }
+}
+
 async function sigiAuthEnviarInvitaciones(){
   var btn=document.getElementById('btnAuthEnviarInvitaciones');
   if(!btn || btn.disabled) return;
-  var limit=Number((document.getElementById('cfgAuthLimit')||{}).value||40);
-  if(!confirm('Esta acción enviará invitaciones reales por correo al personal previamente autorizado (máximo '+limit+'). ¿Desea continuar?')) return;
+
+  var ids=sigiAuthSeleccionActual().slice().sort();
+  if(ids.length<1 || ids.length>5) return toast('Seleccione entre 1 y 5 personas.','error');
+  if(JSON.stringify(ids)!==JSON.stringify(SIGI_AUTH_SELECCION_VALIDADA)){
+    btn.disabled=true;
+    return toast('La selección cambió. Valídela nuevamente antes de enviar.','error');
+  }
+
+  var elegidos=SIGI_AUTH_CANDIDATOS.filter(function(p){return ids.indexOf(p.personal_id)>-1;});
+  var nombres=elegidos.map(function(p){return p.nombre_completo||p.correo||'Usuario';}).join('\n• ');
+  if(!confirm('Se enviarán invitaciones reales SOLO a estas '+ids.length+' persona(s):\n\n• '+nombres+'\n\n¿Desea continuar?')) return;
+
   try{
     btn.disabled=true;
-    var d=await sigiAuthInvocarInvitaciones(true);
+    var d=await sigiAuthInvocarInvitaciones(true,ids);
     var estado=document.getElementById('sigiAuthInvitacionesEstado');
     if(estado) estado.innerHTML='<b>Proceso terminado:</b> '+Number(d.invited||0)+' invitación(es) enviada(s) · '+Number(d.failed_count||0)+' fallida(s). La activación de perfil, rol y asignaciones ocurrirá al primer ingreso.';
     toast(Number(d.invited||0)+' invitación(es) enviada(s).','success');
+    SIGI_AUTH_SELECCION_VALIDADA=[];
+    setTimeout(sigiAuthRevisarPendientes,600);
   }catch(e){
-    btn.disabled=false;
     var estado=document.getElementById('sigiAuthInvitacionesEstado');
     if(estado) estado.textContent='Error: '+(e.message||String(e));
     toast(e.message||String(e),'error');
@@ -4749,8 +4872,135 @@ function obsAbrirModalNuevo(area, cursoPrefill, estudiantePrefill){
   }
 }
 
+async function convivenciaGuardarCasoDirectoDesdeModal(){
+  var estId=academicoEstudianteIdDesdeModal();
+  var desc=((document.getElementById('mdDesc')||{}).value||'').trim();
+  if(!estId||!desc){ toast('Complete estudiante y descripción','error'); return; }
+  var est=ESTUDIANTES.find(function(x){return x.id===estId;});
+  var sel=((document.getElementById('mdEncargado')||{}).value||'');
+  var responsableFuncional='';
+  if(sel==='__auto_coordinacion__') responsableFuncional='COORD_CONVIVENCIA';
+  else if(sel==='coord_convivencia') responsableFuncional='COORD_CONVIVENCIA';
+  else if(sel==='orientador') responsableFuncional='ORIENTACION';
+  else if(sel==='rectoria') responsableFuncional='RECTORIA';
+  else if(sel==='secretaria_academica') responsableFuncional='SECRETARIA_ACADEMICA';
+  else if(sel==='__yo_mismo__') responsableFuncional='';
+  else if(sel==='director_grupo'||sel==='__otro__'){
+    toast('Para crear el asunto oficial de Convivencia seleccione una instancia institucional disponible.','error');
+    return;
+  } else responsableFuncional=responsableFuncionalDesdeSeleccion(sel);
+
+  try{
+    var r=await sb.rpc('crear_registro_directo_convivencia_v2',{
+      p_estudiante_id:estId,
+      p_descripcion:desc,
+      p_responsable_funcional_codigo:responsableFuncional||null,
+      p_prioridad:'NORMAL',
+      p_asunto:'Situación de convivencia registrada directamente'
+    });
+    if(r.error) throw r.error;
+    var d=r.data||{};
+    if(!d.asunto_id) throw new Error('Supabase no devolvió el identificador oficial del asunto.');
+    closeModal();
+    toast('Caso de Convivencia registrado oficialmente en Supabase.','success');
+    await cargarCasosSupabase();
+    var oficial=CASOS.find(function(x){return x.asuntoSupabaseId===d.asunto_id;});
+    if(oficial){
+      casoActivo=oficial;
+      ir('observador');
+      obsTab('individual');
+      obsRenderDetalle('convivencia');
+    } else {
+      var local={
+        id:d.radicado||('ASU-'+Date.now()),radicadoAsunto:d.radicado||'',fecha:new Date().toISOString().slice(0,10),
+        tipo:'Registro directo',naturaleza:'convivencial',clasif:'—',aportante:'Personal institucional',
+        nombreAp:(getSesion()||{}).n||'',est:(est?est.nombre:'')+' — '+(est?est.curso:''),desc:desc,
+        anexos:[],areaProceso:'convivencia',origenRecepcion:'formal',faseObs:1,estadoObs:'pendiente',
+        origen:'directo',origenDatos:'supabase',asuntoSupabaseId:d.asunto_id
+      };
+      CASOS.push(local); casoActivo=local; guardarCasos(); obsRenderDetalle('convivencia');
+    }
+  }catch(err){
+    console.error(err);
+    showModal('No fue posible registrar el caso oficial','<div class="confirm-box">'+fmtEsc((err&&err.message)||String(err))+'</div>','<button class="btn btn-primary" onclick="closeModal()">Aceptar</button>');
+  }
+}
+
+function convivenciaEstudianteIdDesdeCaso(c){
+  if(!c||!c.est) return null;
+  var partes=String(c.est).split(' — '), nombre=(partes[0]||'').trim(), curso=(partes[1]||'').trim();
+  var e=ESTUDIANTES.find(function(x){return x.nombre===nombre && (!curso || x.curso===curso);});
+  return e&&e.id?e.id:null;
+}
+
+async function obsOficializarCasoLocalConvivencia(){
+  var c=casoActivo;
+  if(!c||c.areaProceso!=='convivencia'||c.asuntoSupabaseId) return;
+  var estId=convivenciaEstudianteIdDesdeCaso(c);
+  if(!estId){ toast('No fue posible identificar al estudiante en el backend.','error'); return; }
+  confirmar('Se creará un asunto oficial de Convivencia en Supabase con la información de este registro local. ¿Continuar?',async function(){
+    try{
+      var r=await sb.rpc('crear_registro_directo_convivencia_v2',{
+        p_estudiante_id:estId,
+        p_descripcion:(c.desc||'').trim(),
+        p_responsable_funcional_codigo:'COORD_CONVIVENCIA',
+        p_prioridad:'NORMAL',
+        p_asunto:'Situación de convivencia incorporada desde registro local'
+      });
+      if(r.error) throw r.error;
+      var d=r.data||{};
+      if(!d.asunto_id) throw new Error('Supabase no devolvió asunto_id.');
+      c.asuntoSupabaseId=d.asunto_id; c.radicadoAsunto=d.radicado||''; c.origenDatos='supabase';
+      guardarCasos();
+      await cargarCasosSupabase();
+      casoActivo=CASOS.find(function(x){return x.asuntoSupabaseId===d.asunto_id;})||c;
+      obsRenderDetalle('convivencia'); casosSeguimientoRender();
+      toast('Registro local oficializado en Supabase.','success');
+    }catch(e){console.error(e);toast('No se pudo oficializar: '+((e&&e.message)||e),'error');}
+  });
+}
+
+async function obsVincularCasoLocalConvivencia(){
+  var c=casoActivo;
+  if(!c||c.areaProceso!=='convivencia'||c.asuntoSupabaseId) return;
+  var estId=convivenciaEstudianteIdDesdeCaso(c);
+  if(!estId){ toast('No fue posible identificar al estudiante para buscar asuntos.','error'); return; }
+  try{
+    var q=await sb.from('v_bandeja_casos')
+      .select('asunto_id,radicado_asunto,fecha_apertura,descripcion,fase,estado,estudiante_relacionado_id')
+      .eq('area_proceso','convivencia').eq('estudiante_relacionado_id',estId)
+      .order('fecha_apertura',{ascending:false}).limit(20);
+    if(q.error) throw q.error;
+    var rows=q.data||[];
+    if(!rows.length){toast('No hay asuntos oficiales visibles para este estudiante.','warn');return;}
+    var html='<div class="help-box"><span>🔗</span><span>Seleccione únicamente el asunto oficial que corresponde realmente a este registro local. La vinculación no modifica los datos del asunto en Supabase.</span></div>'+
+      '<div class="field"><label>Asunto oficial</label><select id="vincAsuntoSel">'+
+      rows.map(function(x){return '<option value="'+x.asunto_id+'">'+fmtEsc((x.radicado_asunto||'Sin radicado')+' · '+String(x.fecha_apertura||'').slice(0,10)+' · '+trunc(x.descripcion||'',90))+'</option>';}).join('')+
+      '</select></div>';
+    showModal('Vincular a asunto existente',html,
+      '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="obsConfirmarVinculoCasoLocal()">Vincular</button>');
+  }catch(e){console.error(e);toast('No se pudieron consultar asuntos oficiales: '+((e&&e.message)||e),'error');}
+}
+
+async function obsConfirmarVinculoCasoLocal(){
+  var c=casoActivo, sel=document.getElementById('vincAsuntoSel');
+  if(!c||!sel||!sel.value) return;
+  var asuntoId=sel.value;
+  try{
+    var q=await sb.from('v_bandeja_casos').select('asunto_id,radicado_asunto').eq('asunto_id',asuntoId).limit(1).single();
+    if(q.error) throw q.error;
+    c.asuntoSupabaseId=asuntoId; c.radicadoAsunto=q.data.radicado_asunto||''; c.origenDatos='supabase';
+    guardarCasos(); closeModal();
+    await cargarCasosSupabase();
+    casoActivo=CASOS.find(function(x){return x.asuntoSupabaseId===asuntoId;})||c;
+    obsRenderDetalle('convivencia'); casosSeguimientoRender();
+    toast('Caso vinculado al asunto oficial seleccionado.','success');
+  }catch(e){console.error(e);toast('No se pudo completar la vinculación: '+((e&&e.message)||e),'error');}
+}
+
 async function obsGuardarCasoDirecto(area){
   if(area==='academica') return academicoGuardarCasoDirectoDesdeModal();
+  if(area==='convivencia') return convivenciaGuardarCasoDirectoDesdeModal();
   var s = getSesion();
   var estudiante = document.getElementById('mdEstudianteFijo') ? (document.getElementById('mdEstudianteFijo').value+' — '+document.getElementById('mdCursoFijo').value) : leerParCursoEstudiante('mdCurso','mdEstudiante',null);
   var desc = document.getElementById('mdDesc').value;
@@ -5994,7 +6244,10 @@ function obsFaseContenido(c, n, nombre, total){
     }
     if(c.areaProceso==='convivencia' && nombre==='Recepción' && c.origenDatos!=='supabase' && !c.asuntoSupabaseId){
       out += '<div class="confirm-box no-print" style="margin-top:10px">⚠️ Caso local / no oficial. Este registro todavía no tiene un asunto asociado en Supabase. Debe registrarse o vincularse formalmente antes de iniciar el trámite institucional.</div>';
-      out += '<div class="no-print" style="margin-top:10px"><button class="btn btn-primary" disabled title="Primero debe existir un asunto oficial en Supabase">'+etiquetaBoton+'</button></div>';
+      out += '<div class="no-print" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-primary" onclick="obsOficializarCasoLocalConvivencia()">Registrar como asunto oficial</button>'+
+        '<button class="btn btn-ghost" onclick="obsVincularCasoLocalConvivencia()">Vincular a asunto existente</button>'+
+        '<button class="btn btn-primary" disabled title="Primero debe existir un asunto oficial en Supabase">'+etiquetaBoton+'</button></div>';
     } else {
       out += '<div class="no-print" style="margin-top:10px"><button class="btn btn-primary" onclick="obsAvanzarFase()">'+etiquetaBoton+'</button></div>';
     }
@@ -8378,6 +8631,153 @@ orientacionGuardarSeguimiento=async function(){
 };
 
 </script>
-<!-- SIGI-IEM 10.47 · Recuperación segura de contraseña mediante Supabase Auth -->
+<script>
+/* ============================================================
+   SIGI-IEM 10.50 — FRONTEND FORMATIVO SUPABASE
+   Reconocimientos + Saber Ser + EFC
+   ICC permanece pendiente hasta definir ponderaciones oficiales.
+============================================================ */
+
+var SIGI_FORMATIVO = {
+  periodos: [], dimensiones: [], valores: [], categorias: [], estimulos: [],
+  reconocimientos: [], efc: [], saberSer: {evidencias:[], valoraciones:[]}
+};
+
+function fmtEsc(v){return String(v==null?'':v).replace(/[&<>\"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c];});}
+function fmtFecha(v){if(!v)return '—';try{return new Date(v).toLocaleDateString('es-CO');}catch(e){return String(v);}}
+function fmtSesion(){return getSesion()||{};}
+function fmtTieneCodigo(codigo){var s=fmtSesion();return !!(s.roles&&s.roles.indexOf(codigo)>-1);}
+function fmtEstudiantePorPar(curso,nombre){return ESTUDIANTES.find(function(e){return e.curso===curso&&e.nombre===nombre;})||null;}
+function fmtEstudiantePorId(id){return ESTUDIANTES.find(function(e){return e.id===id;})||null;}
+function fmtPeriodoActualId(){var p=SIGI_FORMATIVO.periodos.find(function(x){return x.activo;});return p?p.id:'';}
+function fmtPeriodoNombre(id){var p=SIGI_FORMATIVO.periodos.find(function(x){return x.id===id;});return p?p.nombre:'—';}
+function fmtDimensionNombre(c){var d=SIGI_FORMATIVO.dimensiones.find(function(x){return x.codigo===c;});return d?d.codigo+' · '+d.nombre:(c||'—');}
+function fmtValorNombre(c){var d=SIGI_FORMATIVO.valores.find(function(x){return x.codigo===c;});return d?d.nombre:(c||'—');}
+function fmtCategoriaNombre(c){var d=SIGI_FORMATIVO.categorias.find(function(x){return x.codigo===c;});return d?d.nombre:(c||'—');}
+function fmtEstimuloNombre(c){var d=SIGI_FORMATIVO.estimulos.find(function(x){return x.codigo===c;});return d?d.nombre:(c||'—');}
+
+async function formativoCargarCatalogos(forzar){
+  if(!forzar && SIGI_FORMATIVO.periodos.length && SIGI_FORMATIVO.dimensiones.length) return;
+  var rs=await Promise.all([
+    sb.from('periodos_academicos').select('*').eq('anio_lectivo',parseInt(CONFIG.ANIO,10)).eq('activo',true).order('numero'),
+    sb.from('saber_ser_dimensiones').select('*').eq('activo',true).order('orden'),
+    sb.from('saber_ser_valores').select('*').eq('activo',true).order('orden'),
+    sb.from('reconocimiento_categorias').select('*').eq('activo',true).order('orden'),
+    sb.from('reconocimiento_estimulos').select('*').eq('activo',true).order('orden')
+  ]);
+  var err=rs.find(function(r){return r.error;});if(err)throw err.error;
+  SIGI_FORMATIVO.periodos=rs[0].data||[];SIGI_FORMATIVO.dimensiones=rs[1].data||[];SIGI_FORMATIVO.valores=rs[2].data||[];SIGI_FORMATIVO.categorias=rs[3].data||[];SIGI_FORMATIVO.estimulos=rs[4].data||[];
+}
+
+function formativoConfigurarPar(idCurso,idEst,callback){
+  configurarParCursoEstudiante(idCurso,idEst,null,null);
+  var ec=document.getElementById(idCurso),ee=document.getElementById(idEst);if(!ec||!ee)return;
+  var old=ec.onchange;ec.onchange=function(){if(old)old();if(callback)callback();};
+  ee.onchange=function(){if(callback)callback();};
+}
+
+/* ---------------- RECONOCIMIENTOS ---------------- */
+async function recRenderLista(){
+  var tb=document.getElementById('tblReconocimientos'),stats=document.getElementById('statsReconocimientos'),f=document.getElementById('fRecCategoria');
+  if(!tb)return;
+  try{
+    await formativoCargarCatalogos(false);
+    if(f){var actual=f.value;f.innerHTML='<option value="">Todas las categorías</option>'+SIGI_FORMATIVO.categorias.map(function(c){return '<option value="'+fmtEsc(c.codigo)+'">'+fmtEsc(c.nombre)+'</option>';}).join('');f.value=actual;}
+    var q=sb.from('reconocimientos').select('*').eq('estado','ACTIVO').order('fecha',{ascending:false}).limit(250);
+    if(f&&f.value)q=q.eq('categoria_codigo',f.value);
+    var r=await q;if(r.error)throw r.error;SIGI_FORMATIVO.reconocimientos=r.data||[];
+    if(stats)stats.innerHTML='<div class="statpill">Visibles para su rol <b>'+SIGI_FORMATIVO.reconocimientos.length+'</b></div>';
+    tb.innerHTML=SIGI_FORMATIVO.reconocimientos.map(function(x){var e=fmtEstudiantePorId(x.estudiante_id);return '<tr><td>'+fmtFecha(x.fecha)+'</td><td>'+fmtEsc(e?sigiNombreEstudiante(e):'Estudiante')+'</td><td>'+fmtEsc(fmtCategoriaNombre(x.categoria_codigo))+(x.valor_codigo?' · '+fmtEsc(fmtValorNombre(x.valor_codigo)):'')+'</td><td>'+fmtEsc(trunc(x.descripcion_factual,70))+'</td><td>'+fmtEsc(fmtEstimuloNombre(x.estimulo_codigo))+'</td><td>Personal autorizado</td></tr>';}).join('')||'<tr><td colspan="6" class="field-hint">Sin reconocimientos visibles todavía.</td></tr>';
+  }catch(e){console.error(e);tb.innerHTML='<tr><td colspan="6" class="field-hint">No se pudieron cargar los reconocimientos: '+fmtEsc(e.message)+'</td></tr>';}
+}
+
+async function recAbrirModalNuevo(cursoPrefill,estudiantePrefill){
+  try{await formativoCargarCatalogos(false);}catch(e){return toast('No se pudieron cargar los catálogos: '+e.message,'error');}
+  var fijo=cursoPrefill&&estudiantePrefill;
+  var campos=fijo?'<div class="row2"><div class="field"><label>Curso</label><input value="'+fmtEsc(sigiCursoMostrar(cursoPrefill))+'" disabled></div><div class="field"><label>Estudiante</label><input value="'+fmtEsc(estudiantePrefill)+'" disabled></div><input type="hidden" id="recCursoFijo" value="'+fmtEsc(cursoPrefill)+'"><input type="hidden" id="recEstudianteFijo" value="'+fmtEsc(estudiantePrefill)+'"></div>':'<div class="row2"><div class="field"><label>Curso</label><select id="recCurso"></select></div><div class="field"><label>Estudiante</label><select id="recEstudiante"></select></div></div>';
+  showModal('Nueva anotación · Reconocimiento',campos+
+    '<div class="row2"><div class="field"><label>Período académico</label><select id="recPeriodo">'+SIGI_FORMATIVO.periodos.map(function(p){return '<option value="'+p.id+'">'+fmtEsc(p.nombre)+'</option>';}).join('')+'</select></div><div class="field"><label>Categoría</label><select id="recCategoria">'+SIGI_FORMATIVO.categorias.map(function(c){return '<option value="'+fmtEsc(c.codigo)+'">'+fmtEsc(c.nombre)+'</option>';}).join('')+'</select></div></div>'+ 
+    '<div class="field"><label>Conducta positiva observada</label><textarea id="recConducta" maxlength="1200" placeholder="Describa un hecho concreto y observable."></textarea></div>'+ 
+    '<div class="row2"><div class="field"><label>Valor INSEG relacionado <span class="field-hint">(opcional)</span></label><select id="recValor" onchange="recActualizarDimension()"><option value="">— Sin valor específico —</option>'+SIGI_FORMATIVO.valores.map(function(v){return '<option value="'+fmtEsc(v.codigo)+'">'+fmtEsc(v.nombre)+'</option>';}).join('')+'</select></div><div class="field"><label>Dimensión del Saber Ser</label><select id="recDimension"><option value="">— Sin dimensión —</option>'+SIGI_FORMATIVO.dimensiones.map(function(d){return '<option value="'+d.codigo+'">'+fmtEsc(d.codigo+' · '+d.nombre)+'</option>';}).join('')+'</select></div></div>'+ 
+    '<div class="field"><label>Estímulo adicional <span class="field-hint">(opcional)</span></label><select id="recEstimulo"><option value="">— Sin estímulo adicional —</option>'+SIGI_FORMATIVO.estimulos.map(function(x){return '<option value="'+fmtEsc(x.codigo)+'">'+fmtEsc(x.nombre)+'</option>';}).join('')+'</select></div>'+ 
+    '<div class="field"><label>Observación complementaria <span class="field-hint">(opcional)</span></label><textarea id="recObservacion" maxlength="600"></textarea></div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-teal" onclick="recGuardar()">Registrar reconocimiento</button>');
+  if(!fijo)formativoConfigurarPar('recCurso','recEstudiante');
+}
+function recActualizarDimension(){var v=document.getElementById('recValor').value,d=document.getElementById('recDimension');var val=SIGI_FORMATIVO.valores.find(function(x){return x.codigo===v;});if(val&&d)d.value=val.dimension_codigo;}
+async function recGuardar(){
+  var fijo=document.getElementById('recCursoFijo'),curso=fijo?fijo.value:document.getElementById('recCurso').value,nombre=fijo?document.getElementById('recEstudianteFijo').value:document.getElementById('recEstudiante').value;
+  var e=fmtEstudiantePorPar(curso,nombre),desc=(document.getElementById('recConducta').value||'').trim();if(!e||!e.id||!desc)return toast('Seleccione estudiante y describa la conducta observada','error');
+  var r=await sb.rpc('registrar_reconocimiento',{p_estudiante_id:e.id,p_periodo_academico_id:document.getElementById('recPeriodo').value,p_categoria_codigo:document.getElementById('recCategoria').value,p_descripcion_factual:desc,p_valor_codigo:document.getElementById('recValor').value||null,p_dimension_codigo:document.getElementById('recDimension').value||null,p_estimulo_codigo:document.getElementById('recEstimulo').value||null,p_observacion:(document.getElementById('recObservacion').value||'').trim()||null,p_anexo_id:null,p_visible_perfil:true,p_fecha:new Date().toISOString()});
+  if(r.error)return toast('No se pudo registrar: '+r.error.message,'error');closeModal();toast('Reconocimiento registrado en Supabase','success');await recRenderLista();if(document.getElementById('fichaEstudianteSel')&&document.getElementById('fichaEstudianteSel').value)fichaRenderSeleccionado();
+}
+
+/* ---------------- SABER SER ---------------- */
+async function saberSerInit(){
+  try{await formativoCargarCatalogos(false);}catch(e){return toast('No se pudo cargar Saber Ser: '+e.message,'error');}
+  var p=document.getElementById('ssPeriodo');if(p&&!p.options.length)p.innerHTML=SIGI_FORMATIVO.periodos.map(function(x){return '<option value="'+x.id+'">'+fmtEsc(x.nombre)+'</option>';}).join('');
+  formativoConfigurarPar('ssCurso','ssEstudiante',saberSerCargarSeleccion);
+  var h=document.getElementById('ssRolHint');if(h)h.innerHTML=fmtTieneCodigo('DIRECTOR_GRUPO')?'Como Director de Grupo puede valorar las cuatro dimensiones y cerrar el período.':'Su rol puede consultar o aportar evidencias según sus permisos. La valoración final corresponde al Director de Grupo.';
+}
+async function saberSerCargarSeleccion(){
+  var curso=document.getElementById('ssCurso').value,nombre=document.getElementById('ssEstudiante').value,pid=document.getElementById('ssPeriodo').value,e=fmtEstudiantePorPar(curso,nombre),wrap=document.getElementById('ssContenido');if(!wrap)return;
+  if(!e||!pid){wrap.innerHTML='<div class="inbox-empty">Seleccione curso, estudiante y período.</div>';return;}
+  wrap.innerHTML='<div class="field-hint">Cargando Valoración Formativa del Saber Ser…</div>';
+  var rs=await Promise.all([sb.from('saber_ser_evidencias').select('*').eq('estudiante_id',e.id).eq('periodo_academico_id',pid).order('fecha_evidencia',{ascending:false}),sb.from('saber_ser_valoraciones_periodo').select('*').eq('estudiante_id',e.id).eq('periodo_academico_id',pid)]);
+  var er=rs.find(function(x){return x.error;});if(er){wrap.innerHTML='<div class="help-box"><span>⚠️</span><span>'+fmtEsc(er.error.message)+'</span></div>';return;}
+  SIGI_FORMATIVO.saberSer.evidencias=rs[0].data||[];SIGI_FORMATIVO.saberSer.valoraciones=rs[1].data||[];
+  var puedeValorar=fmtTieneCodigo('DIRECTOR_GRUPO'),puedeEvid=fmtTieneCodigo('DOCENTE')||fmtTieneCodigo('DIRECTOR_GRUPO')||fmtTieneCodigo('COORDINACION')||fmtTieneCodigo('ORIENTACION');
+  var html='<div class="section-title">'+fmtEsc(sigiNombreEstudiante(e))+' · '+fmtEsc(fmtPeriodoNombre(pid))+'</div><div class="ss-grid">';
+  SIGI_FORMATIVO.dimensiones.forEach(function(d){var v=SIGI_FORMATIVO.saberSer.valoraciones.find(function(x){return x.dimension_codigo===d.codigo;});var ev=SIGI_FORMATIVO.saberSer.evidencias.filter(function(x){return x.dimension_codigo===d.codigo;});html+='<div class="ss-card"><h3>'+fmtEsc(d.codigo+' · '+d.nombre)+'</h3><div class="statbar"><div class="statpill">Nivel <b>'+(v?fmtEsc(v.nivel):'Pendiente')+'</b></div><div class="statpill">Evidencias <b>'+ev.length+'</b></div></div>'+(v?'<p><b>Fundamento:</b> '+fmtEsc(v.fundamento)+'</p><p><b>Fortalezas:</b> '+fmtEsc(v.fortalezas||'—')+'</p><p><b>Por fortalecer:</b> '+fmtEsc(v.aspectos_por_fortalecer||'—')+'</p>':'<div class="field-hint">Sin valoración registrada para esta dimensión.</div>')+(ev.length?'<details><summary>Ver evidencias</summary>'+ev.slice(0,8).map(function(x){return '<div class="mini-evidencia"><b>'+fmtEsc(x.sentido)+'</b> · '+fmtFecha(x.fecha_evidencia)+'<br>'+fmtEsc(x.descripcion_resumen)+'</div>';}).join('')+'</details>':'')+(puedeValorar&&(!v||v.estado!=='CERRADO')?'<button class="btn btn-sm btn-primary" onclick="saberSerAbrirValoracion(\''+d.codigo+'\')">Valorar</button>':'')+'</div>';});
+  html+='</div><div class="formativo-actions">'+(puedeEvid?'<button class="btn btn-ghost" onclick="saberSerAbrirEvidencia()">+ Registrar evidencia</button>':'')+(puedeValorar?'<button class="btn btn-teal" onclick="saberSerCerrarPeriodo()">Cerrar valoración del período</button>':'')+'</div>';wrap.innerHTML=html;
+}
+function saberSerContexto(){var e=fmtEstudiantePorPar(document.getElementById('ssCurso').value,document.getElementById('ssEstudiante').value);return {e:e,pid:document.getElementById('ssPeriodo').value};}
+function saberSerAbrirEvidencia(){var c=saberSerContexto();if(!c.e)return;showModal('Saber Ser · Nueva evidencia','<div class="row2"><div class="field"><label>Dimensión</label><select id="ssEvDim">'+SIGI_FORMATIVO.dimensiones.map(function(d){return '<option value="'+d.codigo+'">'+fmtEsc(d.codigo+' · '+d.nombre)+'</option>';}).join('')+'</select></div><div class="field"><label>Sentido</label><select id="ssEvSent"><option value="FORTALEZA">Fortaleza / progreso</option><option value="ASPECTO_POR_FORTALECER">Aspecto por fortalecer</option><option value="CONTEXTUAL">Evidencia contextual</option></select></div></div><div class="field"><label>Fuente</label><select id="ssEvFuente"><option>RECONOCIMIENTO</option><option>CONVIVENCIA</option><option>DISCIPLINA</option><option>EFC</option><option>ASISTENCIA</option><option>COMPROMISO</option><option>AUTOEVALUACION</option><option>OTRO</option></select></div><div class="field"><label>Descripción breve y factual</label><textarea id="ssEvDesc" maxlength="900"></textarea></div>','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saberSerGuardarEvidencia()">Guardar evidencia</button>');}
+async function saberSerGuardarEvidencia(){var c=saberSerContexto(),desc=(document.getElementById('ssEvDesc').value||'').trim();if(!desc)return toast('Describa la evidencia','error');var r=await sb.rpc('registrar_evidencia_saber_ser',{p_estudiante_id:c.e.id,p_periodo_academico_id:c.pid,p_dimension_codigo:document.getElementById('ssEvDim').value,p_valor_codigo:null,p_fuente_tipo:document.getElementById('ssEvFuente').value,p_fuente_id:null,p_sentido:document.getElementById('ssEvSent').value,p_descripcion_resumen:desc,p_fecha_evidencia:new Date().toISOString()});if(r.error)return toast(r.error.message,'error');closeModal();toast('Evidencia registrada','success');await saberSerCargarSeleccion();}
+function saberSerAbrirValoracion(dim){var c=saberSerContexto(),v=SIGI_FORMATIVO.saberSer.valoraciones.find(function(x){return x.dimension_codigo===dim;});showModal('Valoración Formativa del Saber Ser · '+fmtDimensionNombre(dim),'<div class="field"><label>Nivel</label><select id="ssValNivel"><option>SUPERIOR</option><option>ALTO</option><option>BASICO</option><option>BAJO</option></select></div><div class="field"><label>Fundamento pedagógico</label><textarea id="ssValFund" maxlength="1500">'+fmtEsc(v?v.fundamento:'')+'</textarea></div><div class="row2"><div class="field"><label>Fortalezas</label><textarea id="ssValFort">'+fmtEsc(v?v.fortalezas||'':'')+'</textarea></div><div class="field"><label>Aspectos por fortalecer</label><textarea id="ssValAsp">'+fmtEsc(v?v.aspectos_por_fortalecer||'':'')+'</textarea></div></div><label class="chk-card"><input type="checkbox" id="ssValAjuste" onchange="document.getElementById(\'ssValMotWrap\').classList.toggle(\'hidden\',!this.checked)"> Ajuste motivado respecto de la lectura inicial de evidencias</label><div class="field hidden" id="ssValMotWrap"><label>Motivo del ajuste</label><textarea id="ssValMot"></textarea></div><input type="hidden" id="ssValDim" value="'+dim+'">','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saberSerGuardarValoracion()">Guardar valoración</button>');if(v)document.getElementById('ssValNivel').value=v.nivel;}
+async function saberSerGuardarValoracion(){var c=saberSerContexto(),fund=(document.getElementById('ssValFund').value||'').trim(),aj=document.getElementById('ssValAjuste').checked,mot=(document.getElementById('ssValMot').value||'').trim();if(!fund)return toast('Registre el fundamento pedagógico','error');if(aj&&!mot)return toast('Explique el motivo del ajuste','error');var r=await sb.rpc('guardar_valoracion_saber_ser',{p_estudiante_id:c.e.id,p_periodo_academico_id:c.pid,p_dimension_codigo:document.getElementById('ssValDim').value,p_nivel:document.getElementById('ssValNivel').value,p_fundamento:fund,p_fortalezas:(document.getElementById('ssValFort').value||'').trim()||null,p_aspectos_por_fortalecer:(document.getElementById('ssValAsp').value||'').trim()||null,p_ajuste_motivado:aj,p_motivo_ajuste:aj?mot:null});if(r.error)return toast(r.error.message,'error');closeModal();toast('Valoración guardada','success');await saberSerCargarSeleccion();}
+async function saberSerCerrarPeriodo(){var c=saberSerContexto();if(!c.e)return;confirmar('Se cerrarán las cuatro dimensiones del Saber Ser para este período. Después no podrán reescribirse como borrador. ¿Confirma?',async function(){var r=await sb.rpc('cerrar_saber_ser_periodo',{p_estudiante_id:c.e.id,p_periodo_academico_id:c.pid});if(r.error)return toast(r.error.message,'error');toast('Valoración del Saber Ser cerrada','success');await saberSerCargarSeleccion();});}
+
+/* ---------------- EFC ---------------- */
+async function efcInit(){try{await formativoCargarCatalogos(false);await efcCargarLista();}catch(e){toast('No se pudo cargar EFC: '+e.message,'error');}}
+async function efcCargarLista(){var tb=document.getElementById('efcTabla'),stats=document.getElementById('efcStats');if(!tb)return;var r=await sb.from('efc_remisiones').select('*').order('fecha_remision',{ascending:false}).limit(250);if(r.error){tb.innerHTML='<tr><td colspan="7" class="field-hint">'+fmtEsc(r.error.message)+'</td></tr>';return;}SIGI_FORMATIVO.efc=r.data||[];var f=document.getElementById('efcFiltroEstado'),lista=SIGI_FORMATIVO.efc.filter(function(x){return !f||!f.value||x.estado===f.value;});if(stats)stats.innerHTML='<div class="statpill">Visibles <b>'+SIGI_FORMATIVO.efc.length+'</b></div><div class="statpill">En curso <b>'+SIGI_FORMATIVO.efc.filter(function(x){return x.estado==='EN_CURSO';}).length+'</b></div><div class="statpill">Nueva valoración <b>'+SIGI_FORMATIVO.efc.filter(function(x){return x.estado==='REQUIERE_NUEVA_VALORACION';}).length+'</b></div>';tb.innerHTML=lista.map(function(x){var e=fmtEstudiantePorId(x.estudiante_id);return '<tr><td>'+fmtFecha(x.fecha_remision)+'</td><td>'+fmtEsc(e?sigiNombreEstudiante(e):'Estudiante')+'</td><td>'+fmtEsc(x.ruta_origen)+'</td><td>'+fmtEsc(fmtDimensionNombre(x.dimension_codigo))+'</td><td>'+x.sesiones_planificadas+'</td><td><span class="badge badge-blue">'+fmtEsc(x.estado)+'</span></td><td><button class="btn btn-sm btn-primary" onclick="efcAbrirDetalle(\''+x.id+'\')">Abrir</button></td></tr>';}).join('')||'<tr><td colspan="7" class="field-hint">No hay procesos EFC visibles.</td></tr>';}
+async function efcAbrirNuevaRemision(){if(!(fmtTieneCodigo('DIRECTOR_GRUPO')||fmtTieneCodigo('COORDINACION')))return toast('Su rol no puede crear remisiones EFC','error');try{await formativoCargarCatalogos(false);}catch(e){return toast(e.message,'error');}showModal('EFC · Nueva remisión','<div class="row2"><div class="field"><label>Curso</label><select id="efcCurso"></select></div><div class="field"><label>Estudiante</label><select id="efcEst"></select></div></div><div class="row2"><div class="field"><label>Período</label><select id="efcPeriodo">'+SIGI_FORMATIVO.periodos.map(function(p){return '<option value="'+p.id+'">'+fmtEsc(p.nombre)+'</option>';}).join('')+'</select></div><div class="field"><label>Ruta de origen</label><select id="efcRuta"><option value="DISCIPLINA">Disciplina</option><option value="CONVIVENCIA">Convivencia</option></select></div></div><div class="field"><label>Asunto de origen</label><select id="efcAsunto"><option value="">— Seleccione primero estudiante —</option></select><div class="field-hint">Solo se listan casos existentes de Disciplina o Convivencia del estudiante.</div></div><div class="field"><label>Hechos objetivos que sustentan la remisión</label><textarea id="efcHechos" maxlength="1600"></textarea></div><div class="field"><label>Registros previos / fundamento de reiteración</label><textarea id="efcFund" maxlength="1200"></textarea></div><div class="field"><label>Versión del estudiante</label><textarea id="efcVersion" maxlength="1400"></textarea></div><div class="row2"><div class="field"><label>Dimensión a trabajar</label><select id="efcDim">'+SIGI_FORMATIVO.dimensiones.map(function(d){return '<option value="'+d.codigo+'">'+fmtEsc(d.codigo+' · '+d.nombre)+'</option>';}).join('')+'</select></div><div class="field"><label>Sesiones planificadas</label><select id="efcNumSes"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div></div><label class="chk-card"><input type="checkbox" id="efcNuevaVal" checked> Se realizó nueva valoración pedagógica antes de remitir</label><label class="chk-card"><input type="checkbox" id="efcReqOri"> Requiere concepto funcional de Orientación antes de programar</label>','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="efcGuardarRemision()">Crear remisión</button>');formativoConfigurarPar('efcCurso','efcEst',efcActualizarAsuntos);document.getElementById('efcRuta').onchange=efcActualizarAsuntos;}
+function efcActualizarAsuntos(){var e=fmtEstudiantePorPar(document.getElementById('efcCurso').value,document.getElementById('efcEst').value),ruta=document.getElementById('efcRuta').value,sel=document.getElementById('efcAsunto');if(!sel)return;var lista=e?CASOS.filter(function(c){var estudianteOk=(c.est||'').indexOf(e.nombre)>-1;var rutaOk=ruta==='DISCIPLINA'?c.areaProceso==='administrativo':c.areaProceso==='convivencia';return estudianteOk&&rutaOk&&c.asuntoSupabaseId;}):[];sel.innerHTML='<option value="">— Seleccione caso de origen —</option>'+lista.map(function(c){return '<option value="'+c.asuntoSupabaseId+'">'+fmtEsc((c.id||'Caso')+' · '+trunc(c.desc||'',80))+'</option>';}).join('');}
+async function efcGuardarRemision(){var e=fmtEstudiantePorPar(document.getElementById('efcCurso').value,document.getElementById('efcEst').value),asunto=document.getElementById('efcAsunto').value,hechos=(document.getElementById('efcHechos').value||'').trim(),version=(document.getElementById('efcVersion').value||'').trim();if(!e||!e.id||!hechos||!version)return toast('Complete estudiante, hechos y versión del estudiante','error');if(!asunto)return toast('Seleccione el caso de Disciplina o Convivencia que origina la remisión','error');var r=await sb.rpc('crear_remision_efc',{p_estudiante_id:e.id,p_periodo_academico_id:document.getElementById('efcPeriodo').value,p_ruta_origen:document.getElementById('efcRuta').value,p_asunto_origen_id:asunto,p_hechos_factuales:hechos,p_fundamento_registros_previos:(document.getElementById('efcFund').value||'').trim()||null,p_nueva_valoracion_realizada:document.getElementById('efcNuevaVal').checked,p_version_estudiante:version,p_dimension_codigo:document.getElementById('efcDim').value,p_sesiones_planificadas:parseInt(document.getElementById('efcNumSes').value,10),p_requiere_concepto_orientacion:document.getElementById('efcReqOri').checked});if(r.error)return toast(r.error.message,'error');closeModal();toast('Remisión EFC creada','success');await efcCargarLista();}
+async function efcAbrirDetalle(id){var rem=SIGI_FORMATIVO.efc.find(function(x){return x.id===id;});if(!rem){var qr=await sb.from('efc_remisiones').select('*').eq('id',id).single();if(qr.error)return toast(qr.error.message,'error');rem=qr.data;}var rs=await Promise.all([sb.from('efc_sesiones').select('*').eq('remision_id',id).order('numero_sesion'),sb.from('efc_cierres').select('*').eq('remision_id',id).maybeSingle()]);var ses=rs[0].data||[],cie=rs[1].data||null,e=fmtEstudiantePorId(rem.estudiante_id);var acciones='';if(fmtTieneCodigo('ORIENTACION')&&rem.requiere_concepto_orientacion&&rem.concepto_orientacion==='PENDIENTE')acciones+='<button class="btn btn-primary" onclick="efcConcepto(\''+id+'\')">Emitir concepto Orientación</button> ';if(fmtTieneCodigo('COORDINACION')&&(!rem.facilitador_id)&&(!rem.requiere_concepto_orientacion||['PROCEDE','PROCEDE_CON_ADAPTACION','NO_REQUIERE'].indexOf(rem.concepto_orientacion)>-1))acciones+='<button class="btn btn-primary" onclick="efcProgramar(\''+id+'\')">Programar</button> ';if(rem.facilitador_id===fmtSesion().uid&&['PROGRAMADA','EN_CURSO'].indexOf(rem.estado)>-1&&ses.length<rem.sesiones_planificadas)acciones+='<button class="btn btn-teal" onclick="efcRegistrarSesion(\''+id+'\')">Registrar sesión</button> ';if(rem.facilitador_id===fmtSesion().uid&&rem.estado==='EN_CURSO'&&ses.length>0)acciones+='<button class="btn btn-ghost" onclick="efcProponerCierre(\''+id+'\')">Proponer cierre</button> ';if(fmtTieneCodigo('COORDINACION')&&cie&&!cie.validado_por_coordinacion)acciones+='<button class="btn btn-primary" onclick="efcValidarCierre(\''+id+'\')">Validar cierre</button> ';var html='<div class="help-box"><span>🎯</span><span><b>'+fmtEsc(e?sigiNombreEstudiante(e):'Estudiante')+'</b><br>'+fmtEsc(fmtDimensionNombre(rem.dimension_codigo))+' · '+fmtEsc(rem.ruta_origen)+' · '+fmtEsc(rem.estado)+'</span></div><table class="datatable"><tbody><tr><th>Hechos</th><td>'+fmtEsc(rem.hechos_factuales)+'</td></tr><tr><th>Versión estudiante</th><td>'+fmtEsc(rem.version_estudiante)+'</td></tr><tr><th>Concepto Orientación</th><td>'+fmtEsc(rem.concepto_orientacion)+'</td></tr><tr><th>Sesiones</th><td>'+ses.length+' / '+rem.sesiones_planificadas+'</td></tr></tbody></table><div class="section-title">Sesiones</div>'+(ses.length?ses.map(function(s){return '<div class="mini-evidencia"><b>Sesión '+s.numero_sesion+'</b> · '+fmtFecha(s.fecha_realizada)+' · Avance: '+fmtEsc(s.avance_observable)+'<br>'+fmtEsc(s.sintesis_facilitador)+'</div>';}).join(''):'<div class="field-hint">Aún no hay sesiones registradas.</div>')+(cie?'<div class="section-title">Cierre</div><div class="help-box"><span>✅</span><span><b>'+fmtEsc(cie.resultado)+'</b><br>'+fmtEsc(cie.avance_observado)+'</span></div>':'')+'<div class="formativo-actions">'+acciones+'</div>';showModal('Espacio de Formación Comportamental',html,'<button class="btn btn-ghost" onclick="closeModal()">Cerrar</button>');}
+async function efcConcepto(id){showModal('EFC · Concepto funcional de Orientación','<div class="field"><label>Concepto</label><select id="efcCon"><option value="PROCEDE">Procede</option><option value="NO_PROCEDE">No procede</option><option value="PROCEDE_CON_ADAPTACION">Procede con adaptación</option></select></div><div class="field"><label>Adaptación funcional necesaria <span class="field-hint">No registrar diagnósticos.</span></label><textarea id="efcAdap"></textarea></div>','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="efcGuardarConcepto(\''+id+'\')">Guardar concepto</button>');}
+async function efcGuardarConcepto(id){var r=await sb.rpc('emitir_concepto_efc',{p_remision_id:id,p_concepto:document.getElementById('efcCon').value,p_adaptacion_funcional:(document.getElementById('efcAdap').value||'').trim()||null,p_orientacion_actuacion_id:null});if(r.error)return toast(r.error.message,'error');closeModal();toast('Concepto de Orientación registrado','success');await efcCargarLista();}
+async function efcProgramar(id){try{await cargarUsuariosMensajeria();}catch(e){return toast('No se pudo cargar el directorio de facilitadores','error');}var opts=SIGI_USUARIOS_MENSAJE.filter(function(u){return u.roles.some(function(r){return ['DOCENTE','DIRECTOR_GRUPO','ORIENTACION','COORDINACION'].indexOf(r)>-1;});});showModal('EFC · Programación','<div class="field"><label>Facilitador</label><select id="efcFac">'+opts.map(function(u){return '<option value="'+u.uid+'">'+fmtEsc(u.n+' · '+u.roles.join(', '))+'</option>';}).join('')+'</select></div><div class="row2"><div class="field"><label>Primera sesión</label><input type="date" id="efcF1"></div><div class="field"><label>Fecha de notificación a familia</label><input type="date" id="efcNotif"></div></div><div class="field"><label>Medio de notificación</label><input id="efcMedio" placeholder="Ej. citación escrita, llamada institucional"></div>','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="efcGuardarProgramacion(\''+id+'\')">Programar</button>');}
+async function efcGuardarProgramacion(id){var f=document.getElementById('efcF1').value,n=document.getElementById('efcNotif').value,m=(document.getElementById('efcMedio').value||'').trim();if(!f||!n||!m)return toast('Complete facilitador, fechas y medio de notificación','error');var r=await sb.rpc('programar_efc',{p_remision_id:id,p_facilitador_id:document.getElementById('efcFac').value,p_fecha_primera_sesion:f,p_fecha_notificacion_familia:new Date(n+'T12:00:00').toISOString(),p_medio_notificacion:m});if(r.error)return toast(r.error.message,'error');closeModal();toast('EFC programado','success');await efcCargarLista();}
+async function efcRegistrarSesion(id){var rem=SIGI_FORMATIVO.efc.find(function(x){return x.id===id;});showModal('EFC · Registrar sesión','<div class="field"><label>Actividad / código del cuadernillo</label><input id="efcAct" placeholder="Ej. '+fmtEsc((rem?rem.dimension_codigo:'D1'))+'-S1"></div><div class="row2"><div class="field"><label>Participación</label><select id="efcPart"><option>SI</option><option>PARCIAL</option><option>NO</option></select></div><div class="field"><label>Disposición al diálogo</label><select id="efcDial"><option>SI</option><option>PARCIAL</option><option>NO</option></select></div></div><div class="row2"><div class="field"><label>Cumplimiento compromiso previo</label><select id="efcCum"><option>NO_APLICA</option><option>SI</option><option>PARCIAL</option><option>NO</option></select></div><div class="field"><label>Aplicación de estrategia</label><select id="efcApl"><option>NO_APLICA</option><option>SI</option><option>PARCIAL</option><option>NO</option></select></div></div><div class="field"><label>Avance observable</label><select id="efcAv"><option>SI</option><option>PARCIAL</option><option>NO</option></select></div><div class="field"><label>Síntesis factual del facilitador</label><textarea id="efcSin"></textarea></div><div class="field"><label>Producto verificable</label><textarea id="efcProd"></textarea></div><label class="chk-card"><input type="checkbox" id="efcCont" checked> Requiere continuar</label><label class="chk-card"><input type="checkbox" id="efcProp"> Propone cierre después de esta sesión</label>','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="efcGuardarSesion(\''+id+'\')">Guardar sesión</button>');}
+async function efcGuardarSesion(id){var s=(document.getElementById('efcSin').value||'').trim();if(!s)return toast('Registre la síntesis de la sesión','error');var r=await sb.rpc('registrar_sesion_efc',{p_remision_id:id,p_actividad_codigo:(document.getElementById('efcAct').value||'').trim()||null,p_participacion:document.getElementById('efcPart').value,p_disposicion_dialogo:document.getElementById('efcDial').value,p_cumplimiento_compromiso_previo:document.getElementById('efcCum').value,p_aplicacion_estrategia:document.getElementById('efcApl').value,p_avance_observable:document.getElementById('efcAv').value,p_sintesis_facilitador:s,p_producto_verificable:(document.getElementById('efcProd').value||'').trim()||null,p_anexo_id:null,p_requiere_continuar:document.getElementById('efcCont').checked,p_propone_cierre:document.getElementById('efcProp').checked,p_fecha_programada:null});if(r.error)return toast(r.error.message,'error');closeModal();toast('Sesión EFC registrada','success');await efcCargarLista();}
+async function efcProponerCierre(id){showModal('EFC · Cierre formativo','<div class="field"><label>Resultado</label><select id="efcRes"><option value="REINTEGRO">Reintegro / cierre con avance</option><option value="REQUIERE_NUEVA_VALORACION">Requiere nueva valoración pedagógica</option></select></div><div class="field"><label>Avance observado</label><textarea id="efcCAv"></textarea></div><div class="field"><label>Recomendaciones</label><textarea id="efcCRec"></textarea></div><label class="chk-card"><input type="checkbox" id="efcCOri"> Recomendar acompañamiento de Orientación</label>','<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="efcGuardarCierre(\''+id+'\')">Proponer cierre</button>');}
+async function efcGuardarCierre(id){var av=(document.getElementById('efcCAv').value||'').trim();if(!av)return toast('Describa el avance observado','error');var r=await sb.rpc('cerrar_efc',{p_remision_id:id,p_resultado:document.getElementById('efcRes').value,p_avance_observado:av,p_recomendaciones:(document.getElementById('efcCRec').value||'').trim()||null,p_orientacion_recomendada:document.getElementById('efcCOri').checked});if(r.error)return toast(r.error.message,'error');closeModal();toast('Cierre EFC propuesto','success');await efcCargarLista();}
+async function efcValidarCierre(id){confirmar('Validar el cierre EFC registrado por el facilitador. ¿Confirma?',async function(){var r=await sb.rpc('validar_cierre_efc',{p_remision_id:id});if(r.error)return toast(r.error.message,'error');toast('Cierre EFC validado por Coordinación','success');await efcCargarLista();});}
+
+/* Amplía las pestañas de Bitácora sin alterar los cuatro motores. */
+var _obsTab1048=obsTab;
+obsTab=function(tab){
+  if(tab==='saber-ser'||tab==='efc'){
+    document.querySelectorAll('#sec-observador .subtabs button[data-obtab]').forEach(function(b){b.classList.toggle('on',b.dataset.obtab===tab);});
+    document.querySelectorAll('#sec-observador .obs-panel').forEach(function(p){p.classList.remove('on');});
+    var el=document.getElementById('obs-'+tab);if(el)el.classList.add('on');
+    if(tab==='saber-ser')saberSerInit();else efcInit();actualizarBotonesNuevoCaso();return;
+  }
+  _obsTab1048(tab);
+};
+
+/* Integra datos oficiales en el perfil individual sin convertirlos en antecedentes. */
+var _fichaRenderSeleccionado1048=fichaRenderSeleccionado;
+fichaRenderSeleccionado=function(){_fichaRenderSeleccionado1048();setTimeout(async function(){var curso=document.getElementById('fichaCursoSel').value,nombre=document.getElementById('fichaEstudianteSel').value,e=fmtEstudiantePorPar(curso,nombre),wrap=document.getElementById('fichaDetalleWrap');if(!e||!wrap)return;try{await formativoCargarCatalogos(false);var rr=await sb.from('reconocimientos').select('id,fecha,categoria_codigo,descripcion_factual,valor_codigo,dimension_codigo').eq('estudiante_id',e.id).eq('estado','ACTIVO').order('fecha',{ascending:false}).limit(5);if(!rr.error&&rr.data&&rr.data.length){var box=document.createElement('div');box.innerHTML='<div class="perfil-section-title fortalezas">🌟 Reconocimientos recientes</div>'+rr.data.map(function(x){return '<div class="mini-evidencia"><b>'+fmtEsc(fmtCategoriaNombre(x.categoria_codigo))+'</b> · '+fmtFecha(x.fecha)+(x.dimension_codigo?' · '+fmtEsc(fmtDimensionNombre(x.dimension_codigo)):'')+'<br>'+fmtEsc(x.descripcion_factual)+'</div>';}).join('')+'<div class="formativo-actions"><button class="btn btn-sm btn-teal no-print" onclick="recAbrirModalNuevo(\''+curso.replace(/'/g,"\\'")+'\',\''+nombre.replace(/'/g,"\\'")+'\')">+ Reconocimiento</button><button class="btn btn-sm btn-ghost no-print" onclick="obsTab(\'saber-ser\');setTimeout(function(){document.getElementById(\'ssCurso\').value=\''+curso.replace(/'/g,"\\'")+'\';document.getElementById(\'ssCurso\').onchange();setTimeout(function(){document.getElementById(\'ssEstudiante\').value=\''+nombre.replace(/'/g,"\\'")+'\';saberSerCargarSeleccion();},0);},0)">Abrir Saber Ser</button></div>';wrap.appendChild(box);}}catch(err){console.warn('Perfil formativo:',err);}},0);};
+
+/* Precarga catálogos después de iniciar sesión, sin bloquear la app. */
+var _restaurarSesionSupabase1048=restaurarSesionSupabase;
+restaurarSesionSupabase=async function(){await _restaurarSesionSupabase1048();try{if(getSesion())await formativoCargarCatalogos(true);}catch(e){console.warn('Catálogos formativos:',e);}};
+
+CONFIG.VERSION='1.10.50';
+
+</script>
+<!-- SIGI-IEM 10.50 · Reconocimientos + Saber Ser + EFC integrados con Supabase; ICC pendiente -->
 </body>
 </html>
