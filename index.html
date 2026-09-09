@@ -4795,7 +4795,7 @@ function obsElegirAreaYCrear(desdeIndividual){
 function obsAbrirModalNuevo(area, cursoPrefill, estudiantePrefill){
   var s = getSesion();
   var esAdmin = tieneRol('admin');
-  var esCompetenteConvivencia = tieneRol('admin,rector,coordinacion,orientacion');
+  var esCompetenteConvivencia = tieneRol('rector,coordinacion,orientacion');
   var tituloArea = {academica:'Proceso Académico', convivencia:'Proceso de Convivencia', administrativo:'Disciplina Escolar'}[area];
 
   var campoMotivo = '';
@@ -4854,7 +4854,7 @@ function obsAbrirModalNuevo(area, cursoPrefill, estudiantePrefill){
      se quita la opción "Otro" (y su cuadro de texto suelto) que sobraba en este modal.
      El curso, además, queda restringido a los cursos donde el usuario es Director de
      Grupo o tiene asignación de clase (Admin/Rectoría/Coordinación/Orientación ven todos). */
-  var cursosPermitidos = tieneRol('admin,rector,coordinacion,orientacion') ? null : cursosPermitidosParaAnotacion(s.u);
+  var cursosPermitidos = tieneRol('rector,coordinacion,orientacion') ? null : cursosPermitidosParaAnotacion(s.u);
   if(cursoPrefill && estudiantePrefill){
     /* Viene de Individual: ya se sabe el estudiante — se muestran fijos, en vez
        de un desplegable, para dejar claro que no hay que volver a elegir nada. */
@@ -4865,11 +4865,13 @@ function obsAbrirModalNuevo(area, cursoPrefill, estudiantePrefill){
       '<input type="hidden" id="mdEstudianteFijo" value="'+estudiantePrefill.replace(/"/g,'&quot;')+'">';
   } else {
     configurarParCursoEstudiante('mdCurso','mdEstudiante',null,null,cursosPermitidos);
+    if(area==='administrativo') discActivarSelectorUUIDNuevaDisciplina();
     if(cursosPermitidos && cursosPermitidos.length===1){
       document.getElementById('mdCurso').value = cursosPermitidos[0];
       document.getElementById('mdCurso').onchange();
     }
   }
+  if(area==='administrativo') setTimeout(function(){ sigiPrepararFechaHoraDisciplina(); },0);
 }
 
 async function convivenciaGuardarCasoDirectoDesdeModal(){
@@ -5145,23 +5147,35 @@ function obsDocenteResolverTipo1(){
   toast('Tipo I resuelto — caso avanza a '+obsFaseLabel(c,c.faseObs), 'success');
   obsRenderDetalle('convivencia');
 }
-function obsDocenteRemitir(){
+async function obsDocenteRemitir(){
   var c = casoActivo;
-  var esTipo3 = c.clasifPreliminar==='Posible Tipo III';
-  obsGuardarCamposFase();
-  /* El docente no responde "¿Requiere Verificación?" (esa decisión es de quien
-     recibe la remisión) — por defecto SÍ se asume que la requiere, para no saltarse
-     por accidente un paso que normalmente aplica en Tipo II/III (Art. 43/44). Quien
-     reciba el caso puede ajustarlo después al validar la clasificación. */
-  if(c.requiereVerificacion===undefined) c.requiereVerificacion = true;
-  if(esTipo3){
-    c.valMedidas = document.getElementById('valMedidasDocenteT3') ? document.getElementById('valMedidasDocenteT3').value : c.valMedidas;
-    c.clasif = 'Tipo III';
-    obsRemitirCaso([]);
-  } else {
-    c.clasif = 'Tipo II';
-    var destinos = sigiMultiValues('valDestinoTipo2Docente');
-    obsRemitirCaso(destinos);
+  try{
+    var esTipo3 = c.clasifPreliminar==='Posible Tipo III';
+    obsGuardarCamposFase();
+    var asuntoId=await resolverAsuntoSupabaseId(c);
+    if(esTipo3 && document.getElementById('valMedidasDocenteT3')){
+      var medidas=(document.getElementById('valMedidasDocenteT3').value||'').trim();
+      if(medidas){
+        var act=await sb.rpc('registrar_actuacion_convivencia',{
+          p_asunto_id:asuntoId,p_tipo:'MEDIDA_INMEDIATA',p_descripcion:medidas,p_fase:'VALORACION',p_resultado:null,p_es_reservada:false
+        });
+        if(act.error) throw new Error(act.error.message);
+      }
+    }
+    var posible=esTipo3?'POSIBLE_TIPO_III':'POSIBLE_TIPO_II';
+    var motivo='Valoración preliminar: '+(c.clasifPreliminar||'Requiere valoración institucional')+'. '+(c.desc||'').trim();
+    var r=await sb.rpc('remitir_convivencia_a_coordinacion',{
+      p_asunto_id:asuntoId,p_posible_clasificacion:posible,p_motivo:motivo
+    });
+    if(r.error) throw new Error(r.error.message);
+    toast('Remisión formal registrada. Coordinación asume la valoración institucional.','success');
+    await cargarCasosSupabase();
+    var rec=CASOS.find(function(x){return x.asuntoSupabaseId===asuntoId;});
+    if(rec){casoActivo=rec; await cargarSoportesConvivencia(casoActivo);}
+    obsRenderDetalle('convivencia'); baRenderCasos();
+  }catch(e){
+    console.error(e);
+    toast('No se pudo remitir: '+e.message,'error');
   }
 }
 function obsFasesFor(c){
@@ -5341,7 +5355,7 @@ function obsRenderDetalle(area){
   }
 
   var sSesion = getSesion();
-  var soloLectura = area==='convivencia' && c.remitido && !casoEsMio(c,sSesion) && !tieneRol('admin,rector,coordinacion');
+  var soloLectura = area==='convivencia' && c.remitido && !casoEsMio(c,sSesion) && !tieneRol('rector,coordinacion');
   if(soloLectura){
     html += '<div class="confirm-box" style="margin-top:16px">🔒 Este caso fue remitido a <b>'+c.encargado.nombre+'</b> el '+c.remitidoFecha+' — ya no es competencia suya, queda en modo consulta. Estado actual: <b>'+obsFaseLabel(c,c.faseObs)+'</b>'+(c.clasif!=='—'?' · Clasificación <b>'+c.clasif+'</b>':'')+'.</div>';
   } else {
@@ -5510,8 +5524,8 @@ function decEstadoSiuce(c){
 }
 function decRenderSiuce(c){
   if(decEstadoSiuce(c)) return '<div class="chk-card">✅ Reporte SIUCE registrado</div>';
-  return '<div class="confirm-box">⬜ Reporte SIUCE pendiente.'+(tieneRol('admin,rector')?'':' Debe ser registrado por Rectoría.')+'</div>'+
-    (tieneRol('admin,rector')?'<button class="btn btn-sm btn-primary no-print" onclick="decAbrirSiuce()">Registrar reporte SIUCE</button>':'');
+  return '<div class="confirm-box">⬜ Reporte SIUCE pendiente.'+(tieneRol('rector')?'':' Debe ser registrado por Rectoría.')+'</div>'+
+    (tieneRol('rector')?'<button class="btn btn-sm btn-primary no-print" onclick="decAbrirSiuce()">Registrar reporte SIUCE</button>':'');
 }
 function decAbrirSiuce(){
   showModal('Registrar reporte SIUCE',
@@ -5961,7 +5975,10 @@ function obsFaseContenido(c, n, nombre, total){
       '</tbody></table>'+
       docActionsGeneric(c,'INSEG-CE-F-001-V01','Registro de Recepción');
   } else if(nombre==='Valoración'){
-    var competente = tieneRol('admin,rector,coordinacion,orientacion');
+    var esAutoridadConv = tieneRol('rector,coordinacion');
+    var esGestorTipoI = tieneRol('docente,director_grupo') && !tieneRol('admin,rector,coordinacion,orientacion');
+    var esOrientacionConv = tieneRol('orientacion') && !esAutoridadConv;
+    var competente = esAutoridadConv || esGestorTipoI;
     var esDelictiva = c.naturaleza==='delictiva';
     var clasifPre = c.clasif!=='—' ? c.clasif : '';
     out += '<div class="help-box">Esta valoración solo puede realizarla Rectoría, Coordinación u Orientación Escolar (Art. 97 MIACE).</div>'+
@@ -5973,17 +5990,17 @@ function obsFaseContenido(c, n, nombre, total){
         Object.keys(NATLABEL).map(function(k){ return '<option value="'+k+'" '+(k===c.naturaleza?'selected':'')+'>'+NATLABEL[k]+'</option>'; }).join('')+
       '</select><div class="field-hint">Si deja de corresponder a Convivencia, debe remitirse al proceso competente y no clasificarse como Tipo I/II/III.</div></div>'+
       '<div class="section-title">Criterios de valoración para Tipo II</div>'+
-      '<div class="chk-card"><input type="checkbox" id="valRiesgo" onchange="valAutoClasificar()" '+(c._riesgoTmp&&c._riesgoTmp.r?'checked':'')+'> Existe riesgo actual para la integridad física o emocional</div>'+
-      '<div class="chk-card"><input type="checkbox" id="valReiter" onchange="valAutoClasificar()" '+((c._riesgoTmp&&c._riesgoTmp.rt) || c.reiteracionPrevia===true ?'checked':'')+'> Hay reiteración o relación asimétrica de poder'+(c.reiteracionPrevia===true?' <span class="field-hint">(según lo indicado en la ficha)</span>':'')+'</div>'+
+      '<div class="chk-card"><input type="checkbox" id="valRiesgo" onchange="valAutoClasificar()" '+(c._riesgoTmp&&c._riesgoTmp.r?'checked':'')+'> Se presenta una agresión escolar que causó daño al cuerpo o a la salud sin generar incapacidad</div>'+
+      '<div class="chk-card"><input type="checkbox" id="valReiter" onchange="valAutoClasificar()" '+(c._riesgoTmp&&c._riesgoTmp.rt?'checked':'')+'> Se evidencia agresión, acoso o ciberacoso reiterado o sistemático, o una relación asimétrica de poder</div>'+
       '<div class="section-title">Criterios de valoración para Tipo III</div>'+
       '<div class="chk-card"><input type="checkbox" id="valDelito" onchange="valAutoClasificar()" '+(c._riesgoTmp&&c._riesgoTmp.d?'checked':'')+'> Aparecen elementos que pueden indicar una situación de especial gravedad o posible delito (violencia sexual, armas, SPA)</div>';
 
     if(!competente){
-      /* ---------- DOCENTE: solo orientación preliminar, nunca clasificación definitiva ---------- */
+      /* ---------- ORIENTACIÓN / OTROS: apoyo y valoración preliminar, sin clasificación formal autónoma ---------- */
       var pre = c.clasifPreliminar || '';
-      out += '<div class="field" style="margin-top:14px"><label>Clasificación preliminar / resultado de la valoración inicial</label><select id="valClasifPreliminar">'+
+      out += (esOrientacionConv?'<div class="help-box">Orientación Escolar acompaña, aporta valoración y seguimiento, pero no sustituye la clasificación formal de Coordinación/Rectoría ni la gestión Tipo I del docente/director.</div>':'')+'<div class="field" style="margin-top:14px"><label>Clasificación preliminar / resultado de la valoración inicial</label><select id="valClasifPreliminar">'+
         ['','Posible Tipo I','Posible Tipo II','Posible Tipo III','Requiere valoración por responsable competente'].map(function(t){ return '<option value="'+t+'" '+(pre===t?'selected':'')+'>'+(t||'— Sin definir —')+'</option>'; }).join('')+
-      '</select><div class="field-hint">Esta es una orientación, no una clasificación definitiva — Coordinación, Orientación o Rectoría deben validarla.</div></div>'+
+      '</select><div class="field-hint">Esta es una orientación preliminar. Si el caso supera Tipo I, debe remitirse a Coordinación para valoración institucional.</div></div>'+
         '<button class="btn btn-sm btn-primary no-print" onclick="obsGuardarPreliminarDocente()">Guardar valoración preliminar</button>';
 
       if(pre==='Posible Tipo I'){
@@ -6016,18 +6033,21 @@ function obsFaseContenido(c, n, nombre, total){
       return out;
     }
 
-    /* ---------- COMPETENTE (Admin/Rectoría/Coordinación/Orientación): clasificación validada ---------- */
+    /* ---------- COMPETENTE: Docente/Director para Tipo I; Coordinación/Rectoría para clasificación institucional ---------- */
     if(c.clasifPreliminar){
-      out += '<div class="field-hint" style="margin-top:10px">Orientación preliminar del docente: <b>'+c.clasifPreliminar+'</b></div>';
+      out += '<div class="field-hint" style="margin-top:10px">Orientación preliminar registrada: <b>'+c.clasifPreliminar+'</b></div>';
     }
-    out += '<div id="valUrgenteTipoIII" class="'+(clasifPre==='Tipo III'?'':'hidden')+'">'+
+    out += (esGestorTipoI
+      ? '<div class="help-box"><b>Competencia Tipo I:</b> Docente/Director de Grupo puede confirmar y gestionar una Situación Tipo I dentro de su ámbito. Si los criterios sugieren Tipo II o III, debe remitir el asunto a Coordinación; no puede clasificarlo definitivamente como Tipo II/III.</div>'
+      : '<div class="help-box">Coordinación/Rectoría realizan la valoración institucional de los asuntos que exceden la atención Tipo I de aula.</div>')+
+      '<div id="valUrgenteTipoIII" class="'+(clasifPre==='Tipo III'?'':'hidden')+'">'+
       '<div class="section-title">Actuaciones urgentes · Tipo III</div>'+
       '<div class="help-box"><span>🚨</span><span>Estas actuaciones no esperan a la fase de Decisión. Deben registrarse inmediatamente cuando la valoración determina Tipo III.</span></div>'+
       '<div class="field"><label>Medidas inmediatas de protección</label><textarea id="valProteccionUrgente" placeholder="Registre las medidas adoptadas para proteger a las personas involucradas."></textarea></div>'+
       '<button class="btn btn-sm btn-primary no-print" onclick="valRegistrarProteccionUrgente()">Registrar medida de protección</button>'+
       '<div class="field" style="margin-top:10px"><label>Autoridad competente</label><input id="valAutoridadUrgente" placeholder="Autoridad puesta en conocimiento"></div>'+
       '<div class="row2"><div class="field"><label>Fecha y hora</label><input type="datetime-local" id="valAutoridadUrgenteFecha"></div><div class="field"><label>Referencia / constancia</label><input id="valAutoridadUrgenteRef"></div></div>'+
-      (tieneRol('admin,rector')?'<button class="btn btn-sm btn-red no-print" onclick="valRegistrarAutoridadUrgente()">Registrar comunicación a autoridad</button>':'<div class="confirm-box">La comunicación institucional a la autoridad competente debe ser registrada por Rectoría.</div>')+
+      (tieneRol('rector')?'<button class="btn btn-sm btn-red no-print" onclick="valRegistrarAutoridadUrgente()">Registrar comunicación a autoridad</button>':'<div class="confirm-box">La comunicación institucional a la autoridad competente debe ser registrada por Rectoría.</div>')+
       '<div class="field-hint">Estado: Protección '+(verifTieneActuacion(c,'MEDIDA_PROTECCION')?'✅':'⬜')+' · Autoridad '+(verifTieneActuacion(c,'COMUNICACION_AUTORIDAD_EXTERNA')?'✅':'⬜')+'</div>'+
       '</div>';
 
@@ -6055,7 +6075,7 @@ function obsFaseContenido(c, n, nombre, total){
       '</div>'+
       '<div class="field"><label>Adjuntar evidencia (opcional, disponible desde ya si se anticipa)</label><input type="file" id="valArchivo"><button class="btn btn-sm btn-ghost no-print" onclick="valAdjuntarArchivo()">+ Adjuntar</button><div id="valListaAnexos" style="margin-top:8px"></div></div>'+
       docActionsGeneric(c,'INSEG-CE-F-002-V01','Valoración Inicial de Riesgo');
-    if((c.clasif==='Tipo II' || c.clasif==='Tipo III') && !c.remitido && !tieneRol('admin,rector,coordinacion,orientacion')){
+    if((c.clasif==='Tipo II' || c.clasif==='Tipo III') && !c.remitido && !tieneRol('rector,coordinacion,orientacion')){
       out += '<div class="confirm-box">Este caso ya no es competencia de quien lo reportó (Art. 97/101). Debe remitirse formalmente para continuar.</div>'+
         '<div class="no-print" style="margin-top:10px">'+
         (c.clasif==='Tipo II' ?
@@ -6064,7 +6084,7 @@ function obsFaseContenido(c, n, nombre, total){
           '</div>'
           : '<div class="field-hint">Se bloquea automáticamente en Rectoría por la urgencia del caso (Art. 101).</div>')+
         '<button class="btn btn-teal" onclick="obsRemitirCaso(sigiMultiValues(\'valDestinoTipo2\'))">📨 Remitir a '+(c.clasif==='Tipo III'?'Rectoría':'quien(es) corresponda')+' →</button></div>';
-    } else if((c.clasif==='Tipo II' || c.clasif==='Tipo III') && c.remitido && !tieneRol('admin,rector,coordinacion,orientacion')){
+    } else if((c.clasif==='Tipo II' || c.clasif==='Tipo III') && c.remitido && !tieneRol('rector,coordinacion,orientacion')){
       out += '<div class="confirm-box">✅ Remitido a <b>'+c.encargado.nombre+'</b> el '+c.remitidoFecha+'.</div>'+
         '<div class="section-title">Acta de remisión</div>'+
         docHeader('Acta de Remisión','INSEG-CE-R-001-V01',c)+
@@ -6227,6 +6247,10 @@ function obsFaseContenido(c, n, nombre, total){
     }
   }
   if(esUltima){
+    if(c.areaProceso==='convivencia' && c.clasif==='Tipo I' && tieneRol('docente') && !tieneRol('director_grupo,rector,coordinacion')){
+      out += '<div class="confirm-box no-print" style="margin-top:10px">✅ El docente puede realizar el seguimiento de la Situación Tipo I. El cierre pedagógico debe ser validado por el Director de Grupo, Coordinación o Rectoría.</div>';
+      return out;
+    }
     /* No se deshabilita el botón con el atributo HTML "disabled": si se marca así en el
        momento del render, escribir en el campo de Seguimiento después NO lo reactiva
        (no hay recarga automática) y el caso queda con el botón atascado aunque ya se
@@ -6237,7 +6261,7 @@ function obsFaseContenido(c, n, nombre, total){
   else {
     var etiquetaBoton = 'Guardar y avanzar a '+obsFaseLabel(c,n+1)+' →';
     if(c.areaProceso==='convivencia'){
-      if(nombre==='Recepción') etiquetaBoton='Confirmar recepción y pasar a Valoración →';
+      if(nombre==='Recepción') etiquetaBoton=(tieneRol('docente,director_grupo')&&!tieneRol('admin,rector,coordinacion,orientacion')?'Asumir valoración inicial y continuar →':'Confirmar recepción y pasar a Valoración →');
       if(nombre==='Verificación') etiquetaBoton='Guardar informe y finalizar Verificación →';
       if(nombre==='Decisión') etiquetaBoton='Validar y registrar decisión → pasar a Acción';
       if(nombre==='Acción') etiquetaBoton='Finalizar fase Acción → pasar a Seguimiento';
@@ -6595,6 +6619,24 @@ async function obsClasificarYAvanzar(){
       return;
     }
 
+    var gestorTipoIUI = tieneRol('docente,director_grupo') && !tieneRol('admin,rector,coordinacion,orientacion');
+    if(gestorTipoIUI && clasDb!=='TIPO_I'){
+      var asuntoRem=await resolverAsuntoSupabaseId(c);
+      var posible=clasDb==='TIPO_III'?'POSIBLE_TIPO_III':'POSIBLE_TIPO_II';
+      var rr=await sb.rpc('remitir_convivencia_a_coordinacion',{
+        p_asunto_id:asuntoRem,
+        p_posible_clasificacion:posible,
+        p_motivo:'Valoración inicial del docente/director: '+clasifFormal+'. '+fundamento
+      });
+      if(rr.error) throw new Error(rr.error.message);
+      toast('El caso fue remitido a Coordinación para valoración institucional.','success');
+      await cargarCasosSupabase();
+      var rec=CASOS.find(function(x){return x.asuntoSupabaseId===asuntoRem;});
+      if(rec){casoActivo=rec; await cargarSoportesConvivencia(casoActivo);}
+      obsRenderDetalle('convivencia'); baRenderCasos();
+      return;
+    }
+
     /* Por seguridad jurídica/técnica, Tipo II y III no omiten Verificación desde
        esta interfaz general. La omisión excepcional requerirá una actuación
        motivada específica y un botón separado en una fase posterior. */
@@ -6640,12 +6682,24 @@ async function obsClasificarYAvanzar(){
 /* Traslado formal de competencia (Art. 97/101): el docente/reportante no puede seguir
    trabajando el caso una vez remitido — pasa a modo consulta, y el nuevo encargado
    lo recibe activo en su propia bandeja. */
-function obsRemitirCaso(){
-  if(casoActivo && (casoActivo.origenDatos==='supabase' || casoActivo.asuntoSupabaseId)){
-    toast('La fase de un caso oficial solo puede cambiar mediante el motor seguro de Supabase.','warn');
-    return;
-  }
-  toast('Este registro local no forma parte del motor oficial.','warn');
+async function obsRemitirCaso(){
+  var c=casoActivo;
+  if(!c){toast('No hay caso activo','error');return;}
+  try{
+    var asuntoId=await resolverAsuntoSupabaseId(c);
+    var posible=(c.clasif==='Tipo III'||c.clasifPreliminar==='Posible Tipo III')?'POSIBLE_TIPO_III':
+      ((c.clasif==='Tipo II'||c.clasifPreliminar==='Posible Tipo II')?'POSIBLE_TIPO_II':'REQUIERE_VALORACION_INSTITUCIONAL');
+    var r=await sb.rpc('remitir_convivencia_a_coordinacion',{
+      p_asunto_id:asuntoId,p_posible_clasificacion:posible,
+      p_motivo:'Remisión desde la ruta de Convivencia para valoración institucional.'
+    });
+    if(r.error) throw new Error(r.error.message);
+    toast('Caso remitido formalmente a Coordinación.','success');
+    await cargarCasosSupabase();
+    var rec=CASOS.find(function(x){return x.asuntoSupabaseId===asuntoId;});
+    if(rec) casoActivo=rec;
+    obsRenderDetalle('convivencia'); baRenderCasos();
+  }catch(e){toast('No se pudo remitir: '+e.message,'error');}
 }
 function actaRemisionContenido(c){
   return '<div>'+docHeader('Acta de Remisión','INSEG-CE-R-001-V01',c)+
@@ -6692,9 +6746,11 @@ function valAutoClasificar(){
   var hayTipoIII=!!(delito && delito.checked);
   var hayTipoII=!!(
     (riesgo && riesgo.checked) ||
-    (reiter && reiter.checked) ||
-    (antecedente && antecedente.value==='si')
+    (reiter && reiter.checked)
   );
+  /* La reiteración genérica registrada en la ficha es solo antecedente y NO convierte
+     automáticamente una situación en Tipo II. Deben cumplirse criterios propios de
+     agresión/acoso o afectación a la salud. */
 
   var clasificacion = hayTipoIII ? 'Tipo III' : (hayTipoII ? 'Tipo II' : 'Tipo I');
   sel.value=clasificacion;
@@ -7611,10 +7667,16 @@ async function disciplinaGuardarCasoDirectoDesdeModal(){
   var s=getSesion(),desc=discVal('mdDesc');if(!desc){toast('Describa objetivamente los hechos','error');return;}
   var cursoEl=document.getElementById('mdCursoFijo'),estEl=document.getElementById('mdEstudianteFijo');
   var curso=cursoEl?cursoEl.value:(document.getElementById('mdCurso')||{}).value;
-  var nombre=estEl?estEl.value:(document.getElementById('mdEstudiante')||{}).value;
-  var est=ESTUDIANTES.find(function(x){return x.curso===curso&&x.nombre===nombre;});var estId=est&&est.id;
-  if(!estId){toast('El estudiante debe estar sincronizado con Supabase antes de crear un expediente disciplinario oficial.','error');return;}
-  var fecha=discVal('mdDiscFechaHora');if(fecha)fecha=new Date(fecha).toISOString();
+  var seleccionado=estEl?estEl.value:(document.getElementById('mdEstudiante')||{}).value;
+  var est=estEl
+    ? ESTUDIANTES.find(function(x){return x.curso===curso&&x.nombre===seleccionado;})
+    : ESTUDIANTES.find(function(x){return x.curso===curso&&(x.id===seleccionado||x.nombre===seleccionado);});
+  var estId=est&&est.id;
+  if(!estId){toast('No fue posible identificar el UUID del estudiante en Supabase. Recargue la lista del curso e inténtelo de nuevo.','error');return;}
+  var fechaInput=document.getElementById('mdDiscFechaHora');
+  var fecha=fechaInput?fechaInput.value:'';
+  if(!fecha || fechaInput.dataset.sigiConfirmada!=='1'){toast('Seleccione la fecha y hora del hecho y pulse “Establecer fecha y hora” antes de registrar el caso.','error');return;}
+  fecha=new Date(fecha).toISOString();
   var r=await sb.rpc('crear_registro_directo_disciplina',{p_estudiante_id:estId,p_anio_lectivo:CONFIG.ANIO,p_descripcion_inicial:desc,p_lugar:discVal('mdDiscLugar')||null,p_fecha_hecho:fecha||new Date().toISOString(),p_prioridad:'NORMAL',p_responsable_principal_id:s.uid||null,p_matricula_id:null});
   if(r.error){toast('No se pudo crear el expediente disciplinario: '+r.error.message,'error');return;}
   closeModal();await cargarCasosSupabase();var d=r.data||{};toast('Expediente disciplinario '+(d.codigo||d.radicado)+' creado en Supabase','success');casosSeguimientoRender();await obsAbrirCaso(d.radicado);
@@ -8633,7 +8695,7 @@ orientacionGuardarSeguimiento=async function(){
 </script>
 <script>
 /* ============================================================
-   SIGI-IEM 10.50 — FRONTEND FORMATIVO SUPABASE
+   SIGI-IEM 10.52 — SELECTORES ROBUSTOS ESTUDIANTE Y FECHA
    Reconocimientos + Saber Ser + EFC
    ICC permanece pendiente hasta definir ponderaciones oficiales.
 ============================================================ */
@@ -8775,9 +8837,65 @@ fichaRenderSeleccionado=function(){_fichaRenderSeleccionado1048();setTimeout(asy
 var _restaurarSesionSupabase1048=restaurarSesionSupabase;
 restaurarSesionSupabase=async function(){await _restaurarSesionSupabase1048();try{if(getSesion())await formativoCargarCatalogos(true);}catch(e){console.warn('Catálogos formativos:',e);}};
 
-CONFIG.VERSION='1.10.50';
+
+/* ============================================================
+   PASO 10.52 — ROBUSTEZ DE SELECTORES
+   - Disciplina: el select visible guarda el UUID real de Supabase.
+   - Fecha/hora: confirmación explícita "Establecer fecha y hora".
+============================================================ */
+function discActivarSelectorUUIDNuevaDisciplina(){
+  var sc=document.getElementById('mdCurso'), se=document.getElementById('mdEstudiante');
+  if(!sc||!se)return;
+  sc.onchange=function(){
+    var curso=sc.value;
+    var lista=ESTUDIANTES.filter(function(e){return e.curso===curso&&e.id;});
+    se.innerHTML='<option value="">— Estudiante —</option>'+lista.map(function(e){
+      return '<option value="'+String(e.id).replace(/"/g,'&quot;')+'">'+fmtEsc(sigiNombreEstudiante(e))+'</option>';
+    }).join('');
+  };
+  sc.onchange();
+}
+function sigiFechaHoraLocalAhora(){
+  var d=new Date(), pad=function(n){return String(n).padStart(2,'0');};
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function sigiFormatoFechaHoraLocal(v){
+  if(!v)return 'Sin establecer';
+  try{return new Date(v).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'short'});}catch(_e){return v;}
+}
+function sigiMarcarFechaHoraPendiente(id){
+  var i=document.getElementById(id),e=document.getElementById(id+'Confirmacion');if(!i)return;
+  i.dataset.sigiConfirmada='0';
+  if(e){e.textContent='Pendiente de establecer';e.style.color='var(--amber)';}
+}
+function sigiEstablecerFechaHora(id,usarAhora){
+  var i=document.getElementById(id),e=document.getElementById(id+'Confirmacion');if(!i)return;
+  if(usarAhora||!i.value)i.value=sigiFechaHoraLocalAhora();
+  if(!i.value){toast('Seleccione una fecha y hora válida.','error');return;}
+  var d=new Date(i.value);if(Number.isNaN(d.getTime())){toast('La fecha y hora seleccionadas no son válidas.','error');return;}
+  i.dataset.sigiConfirmada='1';
+  if(e){e.textContent='Establecida: '+sigiFormatoFechaHoraLocal(i.value);e.style.color='var(--teal)';}
+}
+function sigiPrepararFechaHoraDisciplina(){
+  var i=document.getElementById('mdDiscFechaHora');if(!i)return;
+  if(!i.value)i.value=sigiFechaHoraLocalAhora();
+  i.dataset.sigiConfirmada='0';
+  i.addEventListener('input',function(){sigiMarcarFechaHoraPendiente('mdDiscFechaHora');});
+  i.addEventListener('change',function(){sigiMarcarFechaHoraPendiente('mdDiscFechaHora');});
+  if(document.getElementById('mdDiscFechaHoraAcciones'))return;
+  var box=document.createElement('div');
+  box.id='mdDiscFechaHoraAcciones';
+  box.style.cssText='display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:7px';
+  box.innerHTML='<button type="button" class="btn btn-sm btn-ghost" onclick="sigiEstablecerFechaHora(\'mdDiscFechaHora\',true)">Ahora</button>'+
+    '<button type="button" class="btn btn-sm btn-primary" onclick="sigiEstablecerFechaHora(\'mdDiscFechaHora\',false)">Establecer fecha y hora</button>'+
+    '<span id="mdDiscFechaHoraConfirmacion" class="field-hint" style="color:var(--amber)">Pendiente de establecer</span>';
+  i.insertAdjacentElement('afterend',box);
+}
+
+CONFIG.VERSION='1.10.52';
 
 </script>
-<!-- SIGI-IEM 10.50 · Reconocimientos + Saber Ser + EFC integrados con Supabase; ICC pendiente -->
+<!-- SIGI-IEM 10.52 · Selectores robustos: estudiante por UUID en Disciplina + confirmación explícita de fecha/hora; ICC pendiente -->
 </body>
 </html>
+
