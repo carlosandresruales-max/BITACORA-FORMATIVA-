@@ -3502,7 +3502,10 @@ function asisImprimirPlanilla(id){
     '</tbody></table>'+
     '<table style="margin-top:14px"><thead><tr><th>Estudiante</th><th>Estado</th><th>Observación</th></tr></thead><tbody>'+filas+'</tbody></table>'+
     '<div style="font-size:11px;color:#888;margin-top:12px;border-top:1px solid #ddd;padding-top:8px">Documento institucional controlado.</div></div>';
-  var html = '<html><head><title>Planilla de Asistencia</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12.5px}th{background:#f0f4f7}</style></head><body onload="window.print()">'+contenido+'
+  var html = '<html><head><title>Planilla de Asistencia</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12.5px}th{background:#f0f4f7}</style></head><body onload="window.print()">'+contenido+'</body></html>';
+  abrirEnPestana(html);
+}
+</script>
 <script id="sigi-asistencia-agil-js-1083">
 /* ============================================================
    SIGI-IEM 10.83 · ASISTENCIA ÁGIL
@@ -5120,7 +5123,7 @@ function pmImprimir(id){
     '<tr><th>Registrado por</th><td>'+p.registradoPor.n+'</td></tr>'+
     '</tbody></table>'+
     '<div style="font-size:11px;color:#888;margin-top:12px;border-top:1px solid #ddd;padding-top:8px">Documento institucional controlado.</div></div>';
-  var html = '<html><head><title>Permiso de Ausencia</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12.5px}th{background:#f0f4f7;width:180px}</style></head><body>'+contenido+'<script>window.onload=function(){window.print()}<'+'/script></body></html>';
+  var html = '<html><head><title>Permiso de Ausencia</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12.5px}th{background:#f0f4f7;width:180px}</style></head><body onload="window.print()">'+contenido+'</body></html>';
   abrirEnPestana(html);
 }
 
@@ -5444,7 +5447,7 @@ function fichaGenerarResumen(idx){
     '<h3 style="margin-top:16px">Disciplina Escolar ('+porArea.administrativo.length+')</h3>'+tablaArea(porArea.administrativo)+
     '<h3 style="margin-top:16px">Convivencia ('+porArea.convivencia.length+')</h3>'+tablaArea(porArea.convivencia)+
     '</div>';
-  var html = '<html><head><title>Resumen — '+e.nombre+'</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px}th{background:#f0f4f7}</style></head><body>'+contenido+'<script>window.onload=function(){window.print()}<'+'/script></body></html>';
+  var html = '<html><head><title>Resumen — '+e.nombre+'</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px}th{background:#f0f4f7}</style></head><body onload="window.print()">'+contenido+'</body></html>';
   abrirEnPestana(html);
 }
 function fichaGuardarPerfil(idx){
@@ -6066,7 +6069,7 @@ function docImprimir(casoId, codigo, nombreDoc){
   var contenido = (codigo==='INSEG-CE-F-001-V01' || codigo==='INSEG-CE-F-001B-V01') ? docConstanciaHTML(c,false) :
     codigo==='INSEG-CE-R-001-V01' ? actaRemisionContenido(c) :
     '<div>'+docHeader(nombreDoc,codigo,c)+'<table class="datatable"><tbody>'+docTr('Radicado', c.id)+(c.exp?docTr('Expediente',c.exp):'')+docTr('Naturaleza',NATLABEL[c.naturaleza])+docTr('Clasificación',c.clasif)+docTr('Descripción',c.desc)+'</tbody></table>'+docFooter()+'</div>';
-  var html = '<html><head><title>'+nombreDoc+'</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f7;width:210px}.help-box{background:#EBF3FB;border:1px solid #B5D4F4;padding:10px;border-radius:6px;font-size:12px;margin-top:10px}.field-hint{font-size:11px;color:#888}.codebox{font-family:monospace;background:#0b3d63;color:#fff;padding:2px 8px;border-radius:5px;font-size:11px}</style></head><body>'+contenido+'<script>window.onload=function(){window.print()}<'+'/script></body></html>';
+  var html = '<html><head><title>'+nombreDoc+'</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f7;width:210px}.help-box{background:#EBF3FB;border:1px solid #B5D4F4;padding:10px;border-radius:6px;font-size:12px;margin-top:10px}.field-hint{font-size:11px;color:#888}.codebox{font-family:monospace;background:#0b3d63;color:#fff;padding:2px 8px;border-radius:5px;font-size:11px}</style></head><body onload="window.print()">'+contenido+'</body></html>';
   abrirEnPestana(html);
 }
 
@@ -6104,7 +6107,7 @@ function expedienteMiaceVer(casoId){
 function expedienteMiaceImprimir(casoId){
   var c = CASOS.find(function(x){return x.id===casoId;});
   var contenido = document.getElementById('modalBody').innerHTML.replace(/class="no-print"[^>]*>.*?<\/div>/s,'');
-  var html = '<html><head><title>Protocolo de Actuación '+c.exp+'</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12.5px}th{background:#f0f4f7}</style></head><body><h2>Protocolo de Actuación en Convivencia Escolar — '+c.exp+'</h2>'+contenido+'<script>window.onload=function(){window.print()}<'+'/script></body></html>';
+  var html = '<html><head><title>Protocolo de Actuación '+c.exp+'</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12.5px}th{background:#f0f4f7}</style></head><body onload="window.print()"><h2>Protocolo de Actuación en Convivencia Escolar — '+c.exp+'</h2>'+contenido+'</body></html>';
   abrirEnPestana(html);
 }
 
@@ -8327,7 +8330,7 @@ async function verifGenerarCitacion(casoId, destinatario){
     '</tbody></table>'+
     '<div class="help-box" style="margin-top:12px">Se cita para comparecencia dentro del proceso de verificación. La inasistencia injustificada no suspende el proceso.</div>'+
     docFooter()+'</div>';
-  var html = '<html><head><title>Citación</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f7;width:210px}.help-box{background:#EBF3FB;border:1px solid #B5D4F4;padding:10px;border-radius:6px;font-size:12px;margin-top:10px}.codebox{font-family:monospace;background:#0b3d63;color:#fff;padding:2px 8px;border-radius:5px;font-size:11px}</style></head><body>'+contenido+'<script>window.onload=function(){window.print()}<'+'/script></body></html>';
+  var html = '<html><head><title>Citación</title><style>body{font-family:Arial;padding:30px;color:#1a1a18}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}th{background:#f0f4f7;width:210px}.help-box{background:#EBF3FB;border:1px solid #B5D4F4;padding:10px;border-radius:6px;font-size:12px;margin-top:10px}.codebox{font-family:monospace;background:#0b3d63;color:#fff;padding:2px 8px;border-radius:5px;font-size:11px}</style></head><body onload="window.print()">'+contenido+'</body></html>';
   abrirEnPestana(html);
   var tipoAct = destinatario==='acudiente' ? 'CITACION_ACUDIENTE' : 'CITACION_ESTUDIANTE';
   try{
@@ -11218,7 +11221,7 @@ function sigiPrepararFechaHoraDisciplina(){
   i.insertAdjacentElement('afterend',box);
 }
 
-CONFIG.VERSION='1.10.89';
+CONFIG.VERSION='1.10.90';
 var ASUNTO3_PROMOCION_ANTICIPADA=true;
 
 </script>
@@ -11229,4 +11232,3 @@ var ASUNTO3_PROMOCION_ANTICIPADA=true;
 </html>
 
 <!-- 10.58 ESTABILIZACION: carga Excel alineada con RPC v2, año lectivo dinámico, estados de acción unificados, duplicados bloqueados y mapeo de acción/seguimiento a arrays backend. -->
-
