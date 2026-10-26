@@ -29,3 +29,53 @@ No reemplaza la verificación del backend vivo ni autoriza a dar un hallazgo por
 ## Regla de auditoría acumulativa
 
 Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, causa raíz o hipótesis, evidencia, patrón generalizable, señal temprana, prevención, prueba de regresión y estado de verificación. Un patrón recurrente debe convertirse en control automático o checklist permanente.
+
+## Auditoría 2026-10-26
+
+**Alcance:** revisión de solo lectura de SIGI-IEM 10.346 publicado, PostgreSQL/RPC/RLS/Storage y registros HTTP del 25–26 de octubre. No se realizaron pruebas E2E autenticadas ni cambios de producción. Los estados pendientes no implican fallos reproducidos sobre expedientes reales.
+
+### BF-AUD-002 — Escrituras antiguas eluden concurrencia versionada
+- **Estado:** recurrente, confirmado en frontend publicado, definición SQL y tráfico real; corrección pendiente. **Severidad:** alta.
+- **Evidencia:** 22 HTTP 200 a `guardar_borrador_valoracion_convivencia` en la ventana auditada; HTML 10.346 invoca funciones antiguas y no referencia las RPC `*_v2`; la RPC antigua escribe sin comprobar ni incrementar `version`; 14 borradores existentes siguen en versión 1.
+- **Causa raíz:** migración incompleta de consumidores y coexistencia de rutas de escritura incompatibles.
+- **Señal temprana:** llamadas a RPC antiguas después de publicar una nueva; contador de versión inmóvil mientras cambia `updated_at`.
+- **Prevención:** inventario de todas las escrituras frontend/servidor, comparación de firmas y privilegios y test de concurrencia con dos sesiones.
+- **Regla:** todas las rutas que modifican el mismo borrador deben compartir validación e incremento de versión; retirar acceso antiguo solo tras migrar dependencias.
+- **Prueba mínima:** dos sesiones con versiones divergentes; guardar una, intentar guardar la otra y exigir conflicto explícito sin sobrescritura.
+
+### BF-AUD-003 — Validación de evidencias no utilizada por el frontend
+- **Estado:** recurrente, integración pendiente. **Severidad:** alta.
+- **Evidencia:** HTML 10.346 llama `registrar_anexo_convivencia` y no la Edge Function verificada; la RPC antigua mantiene permiso de ejecución para `authenticated`. Los ocho anexos activos tienen objeto en Storage, pero carecen de hash registrado.
+- **Causa raíz:** nueva función segura sin migración del consumidor ni cierre de la vía anterior.
+- **Señal temprana:** función nueva desplegada pero sin llamadas en código/tráfico; archivos sin hash.
+- **Prevención:** prueba integrada subida → verificación de servidor → registro → descarga autorizada, incluyendo negativos.
+- **Regla:** no confirmar una evidencia solo por la respuesta de carga; validar objeto, fase, pertenencia, tamaño, integridad y permisos desde servidor.
+- **Prueba mínima:** archivo válido, alterado, inexistente, ruta ajena y usuario no competente en entorno sintético.
+
+### BF-AUD-004 — Datos no confiables interpolados en HTML
+- **Estado:** riesgo estático confirmado, explotación no demostrada; corrección pendiente. **Severidad:** alta preventiva.
+- **Evidencia:** `verifRenderEvidencia` construye HTML con nombre de archivo y enlaces sin escape visible; `obsRenderDetalleBase` asigna HTML generado a `innerHTML` con campos variables.
+- **Causa raíz probable:** composición de HTML mediante concatenación sin codificación contextual uniforme.
+- **Señal temprana:** interpolaciones de nombres, descripciones o URL dentro de `innerHTML`, `href` o atributos.
+- **Prevención:** usar `textContent`, nodos DOM y validación de protocolos; análisis estático de sinks.
+- **Regla:** datos de expedientes y evidencias nunca deben interpretarse como marcado ejecutable.
+- **Prueba mínima:** cadenas inocuas con etiquetas y comillas deben renderizarse como texto; bloquear esquemas de enlace inseguros.
+
+### BF-AUD-005 — Lectura directa de tabla sin privilegio
+- **Estado:** recurrente, corrección pendiente. **Severidad:** media-alta.
+- **Evidencia:** HTML 10.346 consulta `convivencia_criterios_clasificacion` directamente; `authenticated` carece de SELECT directo; existe RPC autorizada `obtener_criterios_clasificacion_convivencia`.
+- **Causa raíz:** consumidor no migrado a interfaz de lectura autorizada.
+- **Señal temprana:** `sb.from(...)` sobre tabla protegida pese a existir RPC.
+- **Prevención:** matriz de permisos por rol y prueba de carga de clasificación desde frontend.
+- **Regla:** consultas protegidas deben usar el contrato de acceso autorizado; nunca ampliar SELECT para ocultar un fallo de integración.
+- **Prueba mínima:** rol competente consulta correctamente y rol ajeno recibe denegación controlada.
+
+### Seguimiento obligatorio de BF-AUD-001
+- **Estado:** pendiente de certificación E2E. Existen cinco borradores de Verificación; cuatro contienen Plan y tres Síntesis/Informe, lo que no demuestra pérdida de datos.
+- **Regla de regresión:** antes de re-render por compromiso, actuación, evidencia, modal, comunicación o citación, capturar/persistir borrador; después restaurar y comparar los seis campos, recargar y avanzar. No declarar corregido sin prueba autenticada.
+
+### Actividad y cobertura
+- **Ventana:** 2026-10-25 00:55 a 2026-10-26 00:55 (America/Bogota).
+- **API:** 1.978 HTTP 200 y 1 HTTP 204; **Edge Functions:** 1.441 HTTP 200 y 1 HTTP 204; 1.440 ejecuciones de recordatorios. Sin 4xx/5xx observados en esas fuentes, pero esto no certifica módulos sin prueba.
+- **Cambios de datos agregados:** 7 fuentes documentales y 1 remisión creadas durante la ventana. No se inspeccionaron datos personales.
+- **Pruebas:** inspección estática, SQL y tráfico PASS para existencia/configuración; E2E autenticado NO EJECUTADO por ausencia de sesiones de prueba.
