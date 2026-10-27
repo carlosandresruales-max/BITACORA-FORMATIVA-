@@ -79,3 +79,46 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **API:** 1.978 HTTP 200 y 1 HTTP 204; **Edge Functions:** 1.441 HTTP 200 y 1 HTTP 204; 1.440 ejecuciones de recordatorios. Sin 4xx/5xx observados en esas fuentes, pero esto no certifica módulos sin prueba.
 - **Cambios de datos agregados:** 7 fuentes documentales y 1 remisión creadas durante la ventana. No se inspeccionaron datos personales.
 - **Pruebas:** inspección estática, SQL y tráfico PASS para existencia/configuración; E2E autenticado NO EJECUTADO por ausencia de sesiones de prueba.
+
+## Auditoría 2026-10-27
+
+**Alcance y versión:** revisión de solo lectura de Supabase `SIGI-IEM-DEV`, frontend publicado 10.346 (HTTP 200, sin despliegues posteriores al 20-oct), código de RPC y registros de 2026-10-26 00:57:48 a 2026-10-27 00:57:48 (America/Bogota). No se realizaron E2E autenticados ni escrituras en expedientes. No se declara ningún hallazgo corregido sin retest.
+
+### BF-AUD-006 — Validación de documento con HTTP 500
+- **Estado:** nuevo evento observado; causa raíz pendiente. **Severidad:** alta operativa en Asistencia / gestión de personal.
+- **Evidencia:** 1 respuesta HTTP 500 en `/rest/v1/rpc/asistencia_personal_validar_documento` (26-oct 15:25:23 UTC). La función existe; el análisis de privilegios indica que `authenticated` no tiene EXECUTE directo. No está demostrado que la denegación sea la causa del 500.
+- **Patrón:** error interno en función de validación de identidad/documento; posible diferencia entre canal autorizado y consumidor.
+- **Señal temprana:** HTTP 5xx en validación y discrepancia entre permisos de RPC y ruta de invocación.
+- **Prevención:** probar RPC desde el mismo canal y rol usados por la interfaz; inspeccionar error PostgreSQL/Edge con correlación de request, sin exponer documentos.
+- **Regla:** ninguna validación de documento debe fallar silenciosamente ni exponer identificadores; errores deben diferenciar formato, permisos y fallo interno.
+- **Prueba mínima:** documentos sintéticos válidos, no encontrados, duplicados, atípicos y usuario sin autorización; verificar mensajes y ausencia de 5xx.
+
+### BF-AUD-007 — Errores 502/503 en núcleo de Asistencia
+- **Estado:** nuevo evento observado; causa pendiente. **Severidad:** alta operativa.
+- **Evidencia:** `asistencia-docente-v17-core` devolvió HTTP 502 (26-oct 15:01:23 UTC) y HTTP 503 (26-oct 18:01:33 UTC); además 8 HTTP 409 en el mismo núcleo. No se demuestra pérdida de marcaciones ni que 409 sea un fallo.
+- **Patrón:** error transitorio del servicio o dependencia durante operación sensible, con estado de marcación incierto.
+- **Señal temprana:** 5xx, reintentos repetidos, botón que no termina y divergencia entre respuesta y marcación registrada.
+- **Prevención:** idempotencia por request_id, consulta del resultado tras timeout, límites de reintentos y alertas por 5xx.
+- **Regla:** ante respuesta incierta no repetir una marcación sin verificar primero su estado real.
+- **Prueba mínima:** simular 502/503 y desconexión en entorno aislado, verificar recuperación y exactamente una marcación efectiva.
+
+### BF-AUD-008 — Estado de clasificación marcado como cargado antes de completar la lectura
+- **Estado:** nuevo hallazgo estático, no reproducido E2E. **Severidad:** media-alta.
+- **Evidencia:** en frontend 10.346, `loadGeneralPersisted(c)` establece `c._sigi260GeneralLoaded=true` antes de `sb.from('convivencia_criterios_clasificacion')`; si la consulta devuelve error, retorna sin restablecer la bandera. La consulta directa a tabla protegida ya figura en BF-AUD-005.
+- **Patrón:** marca de carga exitosa establecida antes de conocer el resultado; fallo temporal bloquea reintentos.
+- **Señal temprana:** carga de clasificación incompleta sin error visible, ausencia de nuevas consultas al reabrir.
+- **Prevención:** asignar loaded=true únicamente después de respuesta válida, o usar estado `loading/loaded/error` y reintento controlado.
+- **Regla:** nunca marcar datos remotos como cargados si su consulta falló.
+- **Prueba mínima:** provocar rechazo de lectura, corregir el canal autorizado, reabrir y verificar recuperación sin recargar toda la app.
+
+### Seguimiento de hallazgos recurrentes
+- **BF-AUD-001 (re-render):** cinco borradores de Verificación; cuatro con Plan y tres con Síntesis/Informe. No se observó escritura de borradores en esta ventana; la conservación de los seis campos después de compromisos, actuaciones, evidencias y modales sigue sin E2E.
+- **BF-AUD-002 (concurrencia):** frontend 10.346 sigue llamando RPC antiguas; no aparecen referencias a las RPC v2 en el HTML. Catorce borradores en versión 1; cero modificados en la ventana. Pendiente.
+- **BF-AUD-003 (evidencias):** ocho anexos activos, ocho sin hash; frontend continúa llamando RPC antigua. Pendiente.
+- **BF-AUD-004 (HTML):** interpolaciones sin escape visible en `verifRenderEvidencia`; sin prueba de explotación. Pendiente.
+- **BF-AUD-005 (clasificación):** lectura directa de tabla protegida y bandera de carga prematura; pendiente.
+- **RAI:** trece rutas activas; nueve `verification_policy=NULL`. El frontend utiliza `REQUIRED_SAFE_DEFAULT` para rutas específicas sin política, por lo que no se presume omisión automática de Verificación. Revisar políticas y recorridos.
+- **Asistencia:** 19 HTTP 400 en salida manual, 8 en marcación y 4 en estado kiosco; distinguir rechazo legítimo de defecto funcional. 
+- **Seguridad:** 40 avisos informativos RLS sin políticas (21 esquema candidato y 19 public), 9 avisos de funciones privilegiadas para anon y 292 para authenticated. Son señales de revisión, no vulnerabilidades demostradas.
+- **Datos agregados:** 597 migraciones, 160 fuentes documentales, 16 remisiones, 0 solicitudes de firma; sin cambios respecto al cierre anterior. 
+- **Cobertura:** frontend HTTP 200 y SQL/RPC inspeccionados; pruebas de componentes de ejecución, integración autenticada y E2E por rol NO EJECUTADAS por ausencia de sesiones y entorno sintético. Ningún hallazgo se declara corregido hoy.
