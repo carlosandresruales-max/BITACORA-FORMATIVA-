@@ -122,3 +122,46 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Seguridad:** 40 avisos informativos RLS sin políticas (21 esquema candidato y 19 public), 9 avisos de funciones privilegiadas para anon y 292 para authenticated. Son señales de revisión, no vulnerabilidades demostradas.
 - **Datos agregados:** 597 migraciones, 160 fuentes documentales, 16 remisiones, 0 solicitudes de firma; sin cambios respecto al cierre anterior. 
 - **Cobertura:** frontend HTTP 200 y SQL/RPC inspeccionados; pruebas de componentes de ejecución, integración autenticada y E2E por rol NO EJECUTADAS por ausencia de sesiones y entorno sintético. Ningún hallazgo se declara corregido hoy.
+
+
+## Auditoría 2026-10-28
+
+**Alcance:** consulta directa y no destructiva de Vercel, Supabase (PostgreSQL, RPC, Edge Functions, Storage y logs) y repositorio. Ventana de logs 2026-10-27 01:04 a 2026-10-28 01:04 America/Bogota. Despliegue SIGI-IEM 10.346 sigue READY (20-oct), sin nuevas migraciones. No se ejecutaron pruebas E2E autenticadas por ausencia de sesiones y entorno sintético. No se corrigieron expedientes ni funciones.
+
+### BF-AUD-009 — Consulta de marcación por requestId sin vínculo con dispositivo
+- **Estado:** nuevo riesgo de autorización confirmado por inspección estática; acceso indebido no explotado. **Severidad:** alta.
+- **Evidencia:** Edge Function \`asistencia-docente-v17-core\` versión 2 tiene \`verify_jwt=false\` y usa credencial de servicio. En \`verify(body)\`, si se aporta \`requestId\`, llama \`asistencia_verificar_request\` sin exigir \`deviceToken\`. La RPC interna \`verificar_request_marcacion\` busca solo por UUID y devuelve \`personalId\`, tipo, hora y estado de jornada. La validación de Origin/CORS no sustituye la autorización del sujeto.
+- **Causa raíz:** recuperación idempotente basada en identificador de solicitud sin comprobación de pertenencia al dispositivo/usuario.
+- **Señal temprana:** endpoint de lectura con rol privilegiado que recibe únicamente un identificador de registro y devuelve datos personales.
+- **Prevención:** matriz de autorización por recurso; pruebas negativas de token ausente/ajeno y requestId ajeno.
+- **Regla:** cada consulta de resultado debe demostrar pertenencia al actor, no solo conocer el identificador; conservar idempotencia sin divulgar datos ajenos.
+- **Prueba mínima:** en entorno aislado, comprobar que el dispositivo propietario recupera su resultado y otro dispositivo no recibe datos, aun con el requestId correcto.
+
+### BF-AUD-010 — Modalidad QR indicada sin comprobación del token QR
+- **Estado:** nuevo riesgo estático; depende del requisito funcional del QR. **Severidad:** media-alta, alta si QR acredita presencia.
+- **Evidencia:** \`asistencia-docente-v17-core\` recibe \`markQr\`, pero solo utiliza \`!!body.qrToken\` para \`qrPresent\` en metadatos; no verifica el valor, firma, vigencia ni asociación del QR. La función SQL de marcación no contiene referencias a \`qrToken\` ni \`qrPresent\`.
+- **Causa raíz probable:** modo QR representado como etiqueta de método y no como comprobación de credencial.
+- **Señal temprana:** parámetro \`qrToken\` usado solo como booleano; ausencia de verificación del código.
+- **Prevención:** contrato formal del QR (si es requisito de presencia), validación criptográfica y caducidad del token en servidor; prueba negativa con token inválido.
+- **Regla:** no presentar una marcación como verificada por QR si el servidor no valida efectivamente ese QR.
+- **Prueba mínima:** token QR válido, ausente, alterado, vencido y reutilizado; comprobar rechazo seguro según el protocolo.
+
+### BF-AUD-011 — Códigos 409 de Asistencia requieren diagnóstico por código interno
+- **Estado:** recurrente, nueva desagregación verificable. **Severidad:** media-alta operativa.
+- **Evidencia:** 15 HTTP 409 en \`asistencia-docente-v17-core\`; logs internos: 7 \`GPS_PRECISION_TOO_LOW\`, 5 \`OUTSIDE_GEOFENCE\` y 3 \`OFFLINE_STATE_CONFLICT\`. La función mapea múltiples validaciones al mismo HTTP 409. No se observaron HTTP 5xx en esta ventana.
+- **Causa raíz:** distintas causas de rechazo agrupadas bajo un mismo estado HTTP; no se ha demostrado error de geocerca ni GPS.
+- **Señal temprana:** aumento de 409 sin clasificación por \`code\`; usuarios que reintentan sin comprender motivo.
+- **Prevención:** tableros por código, pruebas de ubicación con precisión insuficiente, geocerca y colas offline, consulta de estado antes de reintentar.
+- **Regla:** nunca clasificar un 409 como duplicado sin leer el código de negocio; no registrar marcación rechazada como exitosa.
+- **Prueba mínima:** simular cada condición, confirmar mensaje correcto, preservación de solicitud offline y ausencia de doble marcación.
+
+### Seguimiento de patrones recurrentes y cobertura
+- **BF-AUD-001:** cinco borradores de Verificación; cuatro con Plan y tres con Síntesis/Informe, seis claves presentes en los cinco. La pérdida por re-render sigue sin E2E. Preservar antes de compromisos, actuaciones, evidencias y modales; comprobar tras recarga.
+- **BF-AUD-002:** 14 borradores, ninguno con versión superior a 1; funciones antiguas aún ejecutables y sin incremento de versión. Sin escrituras de borrador en la ventana. No declarar resuelto.
+- **BF-AUD-003:** ocho anexos activos, ocho objetos localizados en Storage, ocho sin hash. Registro verificado pendiente.
+- **BF-AUD-004/005/008:** riesgos de HTML, consulta directa de clasificación y bandera de carga prematura pendientes por ausencia de nueva publicación y retest.
+- **API:** 2776 HTTP 200, 2 HTTP 201, 4 HTTP 204, 23 HTTP 400 y 7 HTTP 401. Los 400 corresponden a 15 marcaciones y 8 consultas de estado kiosco; los 401 a cinco consultas de coordinador académico, una de remisiones y una de periodos. No se determinó si las 401 son expiración de sesión, denegación correcta o regresión.
+- **Edge:** 1710 HTTP 200, 250 HTTP 204, 15 HTTP 409. Los tres HTTP 5xx de la ventana anterior no se repitieron, pero no se declaran corregidos.
+- **Postgres:** 23 ERROR P0001 y 8 ERROR 42501; correlación causal individual no establecida.
+- **Datos agregados:** 160 fuentes documentales, 16 remisiones, 13 rutas activas (nueve con política NULL), 0 solicitudes de firma, 40 avisos RLS sin políticas. Sin cambios.
+- **Pruebas:** PASS de inspección de despliegue, existencia de RPC y conciliación básica Storage; FAIL estático de controles de autorización en recuperación por requestId y de verificación de QR; componentes interactivos, integración autenticada y E2E NO EJECUTADOS. No hubo cambios de producción.
