@@ -165,3 +165,50 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Postgres:** 23 ERROR P0001 y 8 ERROR 42501; correlación causal individual no establecida.
 - **Datos agregados:** 160 fuentes documentales, 16 remisiones, 13 rutas activas (nueve con política NULL), 0 solicitudes de firma, 40 avisos RLS sin políticas. Sin cambios.
 - **Pruebas:** PASS de inspección de despliegue, existencia de RPC y conciliación básica Storage; FAIL estático de controles de autorización en recuperación por requestId y de verificación de QR; componentes interactivos, integración autenticada y E2E NO EJECUTADOS. No hubo cambios de producción.
+
+
+## Auditoría 2026-10-29
+
+**Alcance:** inspección de solo lectura de despliegue Vercel, frontend HTML publicado, funciones y permisos PostgreSQL, tablas de borradores/actas/evidencias, Edge Function de Asistencia y logs Supabase. Ventana 2026-10-28 01:01:07 a 2026-10-29 01:01:07 (America/Bogota). Versión publicada 10.346 (despliegue 20-oct), backend ACTIVE_HEALTHY, 597 migraciones. Sin E2E autenticadas por falta de sesiones aisladas; no se alteraron expedientes ni código productivo.
+
+### BF-AUD-012 — Rechazos repetidos de dispositivo no vinculado
+
+- **Estado:** nuevo patrón de frecuencia; causa individual y regresión no demostradas. **Severidad:** media-alta en Asistencia.
+- **Evidencia:** 18 eventos \`ATTENDANCE_ERROR\` con código \`DEVICE_NOT_LINKED\` en logs de Edge Functions durante la ventana; 18 HTTP 400 en \`asistencia_contexto_inicio\`. La coincidencia de totales no establece correspondencia uno a uno. El código de Asistencia devuelve el código de error explícito. No se inspeccionaron identificadores personales.
+- **Causa raíz posible:** desvinculación real, token/caché desincronizado, reinstalación, cambio de navegador o problema de persistencia del token; requiere correlación por identificador técnico anonimizado.
+- **Señal temprana:** aumento de \`DEVICE_NOT_LINKED\` tras actualizar PWA, reiniciar sesión o cambiar dispositivo.
+- **Prevención:** prueba de vinculación/revinculación, persistencia de token, actualización de PWA y validación de un solo dispositivo, con autorización administrativa.
+- **Regla:** ante \`DEVICE_NOT_LINKED\`, diferenciar seguridad legítima de pérdida involuntaria de vínculo; no revincular automáticamente ni omitir controles.
+- **Prueba mínima:** vincular dispositivo sintético, marcar, recargar, actualizar PWA y reiniciar; confirmar vínculo persistente. Revocar y verificar denegación y flujo de recuperación autorizado.
+
+### BF-AUD-013 — Conflictos offline y reintentos repetidos
+
+- **Estado:** recurrente, pendiente de reproducción controlada. **Severidad:** alta para integridad de Asistencia.
+- **Evidencia:** 30 HTTP 409 en \`asistencia-docente-v17-core\`; logs de aplicación con 5 \`OFFLINE_STATE_CONFLICT\` y 1 \`OFFLINE_CAPTURE_EXPIRED\`. También 5 \`OUTSIDE_GEOFENCE\` y 2 \`GPS_PRECISION_TOO_LOW\`; los totales de eventos de aplicación no son equivalentes a solicitudes HTTP únicas.
+- **Causa posible:** estado local desactualizado, reintentos de una misma solicitud, expiración de captura o validaciones de ubicación; no se demostró duplicación efectiva.
+- **Señal temprana:** múltiples 409 para el mismo intento, cola offline que no se resuelve, estado incierto y botón que invita a remarcar.
+- **Prevención:** request_id idempotente, verificación del resultado real, cola persistente y distinción entre rechazo legítimo y conflicto recuperable.
+- **Regla:** nunca crear otra marcación para resolver un conflicto sin consultar primero el resultado del intento original.
+- **Prueba mínima:** dos reintentos offline del mismo intento, cambio de estado entre captura y envío, captura vencida; exigir una sola marcación válida y mensajes comprensibles.
+
+### BF-AUD-014 — Códigos HTTP 400 agrupados ocultan módulos afectados
+
+- **Estado:** nueva señal operativa, fallo funcional no confirmado. **Severidad:** media.
+- **Evidencia:** 38 HTTP 400 en API: 18 en \`asistencia_contexto_inicio\`, 14 en \`asistencia_registrar_marcacion\`, 6 en \`asistencia_apps_script_estado_kiosco\`. PostgreSQL registró 38 errores \`P0001\`; no se estableció correlación individual.
+- **Señal temprana:** incremento de 400 en contexto inicial o kiosco tras una actualización, incluso sin 5xx.
+- **Prevención:** tablero de rechazos por RPC, código funcional y tipo de dispositivo, sin registrar documentos ni tokens.
+- **Regla:** clasificar cada 400 como rechazo esperado, error de datos o defecto; no contar todo 400 como fallo ni todo 200 como éxito E2E.
+- **Prueba mínima:** contexto de dispositivo vinculado/no vinculado, marcación válida/inválida y estado de kiosco, comparando mensajes y registros de backend.
+
+### Seguimiento de riesgos previos y regresión obligatoria
+
+- **BF-AUD-009:** persiste en código de Edge Function \`asistencia-docente-v17-core\` versión 2: \`verify(requestId)\` llama \`asistencia_verificar_request\` sin requerir pertenencia por token. No se explotó ni corrigió. Prioridad alta de seguridad.
+- **BF-AUD-010:** \`qrToken\` sigue siendo indicador de presencia en \`markQr\`, sin verificación de autenticidad visible en ese recorrido. Revisar contrato del QR. Pendiente.
+- **BF-AUD-001:** frontend 10.346 mantiene campos \`verifPlan\` y \`verifInforme\`; cinco borradores de Verificación contienen ambas claves, cuatro Plan con texto y tres Informe con texto. Cero borradores modificados en la ventana. Sin E2E de compromiso/actuación/evidencia/modal + recarga. **No declarar corregido.**
+- **BF-AUD-002:** frontend publicado contiene referencias a \`guardar_borrador_fase_convivencia\` y \`guardar_borrador_valoracion_convivencia\`, sin \`*_v2\`; ambas RPC antiguas siguen ejecutables por \`authenticated\`. Catorce borradores, ninguno con versión >1. Pendiente.
+- **BF-AUD-003:** frontend continúa con \`registrar_anexo_convivencia\` y sin referencia a Edge Function verificada. Ocho anexos ACTIVO, ocho objetos correspondientes en Storage, ocho sin hash SHA-256. Pendiente.
+- **BF-AUD-004/005/008:** interpolaciones HTML, lectura directa de clasificación y bandera de carga prematura continúan como riesgos del frontend 10.346, sin retest autenticado.
+- **RAI/actas:** 13 rutas activas, 9 sin política explícita; 160 fuentes documentales, 16 remisiones, 0 solicitudes de firma. No se observaron nuevas escrituras de borradores; actas, firma, permisos y transiciones siguen sin E2E.
+- **Cobertura:** HTTP de frontend 200; logs API 2414×200, 2×201, 4×204, 38×400; Edge 1700×200, 205×204, 30×409; cero 5xx en ventana. Los 5xx anteriores no se consideran corregidos sin prueba causal. Vercel no entregó logs históricos por retención del plan. No hubo cambios en producción.
+
+**Próximo control obligatorio:** pruebas por rol y entorno sintético de preservación de los seis campos de Verificación antes/después de registrar compromiso, actuación, evidencia, modal, recarga y transición; autorización de \`verify(requestId)\`; autenticidad QR; vínculo del dispositivo; reintentos offline; migración RPC v2 y evidencias verificadas.
