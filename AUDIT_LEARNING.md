@@ -212,3 +212,59 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Cobertura:** HTTP de frontend 200; logs API 2414×200, 2×201, 4×204, 38×400; Edge 1700×200, 205×204, 30×409; cero 5xx en ventana. Los 5xx anteriores no se consideran corregidos sin prueba causal. Vercel no entregó logs históricos por retención del plan. No hubo cambios en producción.
 
 **Próximo control obligatorio:** pruebas por rol y entorno sintético de preservación de los seis campos de Verificación antes/después de registrar compromiso, actuación, evidencia, modal, recarga y transición; autorización de \`verify(requestId)\`; autenticidad QR; vínculo del dispositivo; reintentos offline; migración RPC v2 y evidencias verificadas.
+
+
+## Auditoría 2026-10-30
+
+**Alcance:** auditoría de solo lectura de Bitácora Formativa, Vercel y Supabase \`SIGI-IEM-DEV\`, ventana 2026-10-29 01:04–2026-10-30 01:04 (America/Bogota). SIGI-IEM permanece en despliegue 10.346 del 20-oct; Asistencia recibió nueva publicación el 29-oct 18:31 local. Backend ACTIVE_HEALTHY; 597 migraciones registradas. No hubo pruebas E2E autenticadas ni cambios de expedientes, permisos o producción por esta auditoría.
+
+### BF-AUD-015 — Prueba de notificaciones push falla con error genérico
+- **Estado:** NUEVO, fallo de servicio observado, causa técnica final no determinada. **Severidad:** alta operativa.
+- **Evidencia:** 10 HTTP 400 de \`asistencia-recordatorios-api\` v2 entre 2026-10-29 23:27 y 23:32 UTC; 10 logs \`SMART_REMINDER_API_ERROR Received unexpected response code\`. La función \`sendTest\` llama \`webpush.sendNotification\`; su catch devuelve el mismo HTTP 400 genérico sin status del proveedor. Se registraron errores incluso después de la última publicación de Asistencia (23:31:24 UTC).
+- **Hipótesis:** rechazo del proveedor push, suscripción caducada, VAPID o configuración; no se demuestra cuál.
+- **Señal temprana:** botón de prueba sin notificación y múltiples HTTP 400 con mensaje genérico.
+- **Prevención/regla:** conservar status y tipo de error del proveedor en logs técnicos anonimizados; diferenciar suscripción inválida, credenciales, permisos del navegador y falla transitoria. Nunca declarar entrega por HTTP 200 de cron.
+- **Prueba mínima:** con suscripción sintética y dispositivo de prueba, solicitar push y confirmar recepción; probar 404/410, VAPID inválido, permiso denegado, desconexión y reintento idempotente.
+
+### BF-AUD-016 — Resolver alerta no conserva actor y cron puede reabrirla
+- **Estado:** NUEVO, incompatibilidad de lógica confirmada por SQL; re-apertura efectiva no reproducida. **Severidad:** alta en trazabilidad.
+- **Evidencia:** \`asistencia_alerta_marcacion_resolver\` escribe \`estado='RESUELTA'\` y \`resuelta_at\`, pero \`p_actor\` aparece únicamente en la respuesta JSON, sin guardarse. No hay triggers de auditoría en \`asistencia_docente_candidate.alertas_marcacion\`. \`asistencia_alertas_marcacion_sincronizar\` ejecuta \`ON CONFLICT ... DO UPDATE SET estado='PENDIENTE', resuelta_at=null\` cuando persiste el motivo de alerta. Cron v5 ejecuta sincronización periódica.
+- **Señal temprana:** alertas resueltas que reaparecen o sin identidad/motivo del cierre.
+- **Prevención/regla:** toda resolución administrativa debe registrar actor, fecha, motivo y evento; la reconciliación automática debe distinguir nueva incidencia de alerta ya resuelta y no borrar trazabilidad.
+- **Prueba mínima:** alerta sintética → resolver con actor autorizado → ejecutar sincronización → verificar estado y auditoría conforme a regla institucional; repetir si aparece un nuevo evento real.
+
+### BF-AUD-017 — Desajuste temporal de modalidad AUTO y restricción SQL
+- **Estado:** NUEVO evento, **corrección estructural verificada**, prueba E2E pendiente. **Severidad:** media.
+- **Evidencia:** PostgreSQL SQLSTATE 23514 el 29-oct 22:48:13 UTC por \`asistencia_recordatorios_modo_check\`. A las 22:48:37 UTC se registró DDL de sustitución de restricción. Consulta actual confirma que acepta \`SEMANA\`, \`DIA\` y \`AUTO\`; existen 2 suscripciones activas con modo AUTO.
+- **Causa:** desalineación temporal entre nuevo contrato de frontend/API y restricción de base de datos.
+- **Señal temprana:** errores 23514 tras introducir nuevo valor enumerado.
+- **Prevención/regla:** desplegar migración compatible antes de activar el nuevo consumidor; comprobar constraints y payloads.
+- **Prueba mínima:** alta, actualización, desactivación y reactivación de suscripción sintética con modo AUTO; recarga y verificación de persistencia. No considerar funcionalidad completa corregida sin retest.
+
+### BF-AUD-018 — Estado de envío y cobertura de recordatorios insuficientemente certificados
+- **Estado:** NUEVO riesgo estático y brecha operativa; falla de actualización no reproducida. **Severidad:** media-alta.
+- **Evidencia:** cron v5 envía webpush y llama \`markSent\`, que no inspecciona \`error\` de \`update\`; \`release\` tampoco comprueba errores de \`delete\`. Existen 13 registros \`SENT\`, 0 \`PENDING\`, 2 suscripciones activas y 37 alertas \`PENDIENTE\` de nivel 3 del 29-oct (19 ENTRADA y 18 SALIDA). \`SENT\` significa registro de aceptación/envío, no recepción visible.
+- **Señal temprana:** push reportado como enviado sin recibirse, reclamaciones estancadas o ausencia de suscripciones frente a alertas.
+- **Prevención/regla:** comprobar resultado de todas las escrituras de estado, reconciliar reclamaciones pendientes y distinguir envío aceptado de notificación mostrada. Medir cobertura de usuarios habilitados sin exponer datos personales.
+- **Prueba mínima:** simular fallo de UPDATE después de push, recuperación y reintento sin duplicación; probar suscripciones caducadas, alta de nuevos dispositivos y confirmación de recepción.
+
+### BF-AUD-019 — Cambios directos de esquema sin migración registrada
+- **Estado:** NUEVO, deriva de esquema confirmada en ventana. **Severidad:** media-alta para reproducibilidad y reversión.
+- **Evidencia:** seis entradas PostgreSQL con \`CREATE OR REPLACE FUNCTION\` entre 29-oct 22:48 y 23:02 UTC, además de \`ALTER TABLE asistencia_recordatorios\`; contador de \`supabase_migrations.schema_migrations\` sigue en 597, última versión \`20261021120742\`.
+- **Causa probable:** ajustes manuales aplicados fuera del historial de migraciones.
+- **Señal temprana:** objetos y definiciones modificados sin aumento del contador o sin archivo versionado.
+- **Prevención/regla:** reconciliar el estado vivo con migraciones idempotentes versionadas, conservar diffs, rollback y pruebas; nunca reejecutar DDL a ciegas sobre producción.
+- **Prueba mínima:** recrear esquema en entorno aislado desde migraciones y comparar definiciones de funciones, constraints, GRANT y RLS.
+
+### Seguimiento recurrente, estado y pruebas
+- **BF-AUD-001:** cinco borradores de Verificación, cuatro con \`verifPlan\` no vacío y tres con \`verifInforme\`; se comprobaron seis claves distintas. Ningún borrador modificado en 24 h. Sin prueba de compromiso/actuación/evidencia/modal + recarga. **Pendiente de E2E, no corregido.**
+- **BF-AUD-002:** 14 borradores, cero con versión >1. RPC antiguas \`guardar_borrador_fase_convivencia\` y \`guardar_borrador_valoracion_convivencia\` siguen con EXECUTE de authenticated, sin referencias de versión en sus definiciones; v2 también disponibles. **Pendiente.**
+- **BF-AUD-003:** ocho anexos activos, ruta de registro antiguo en frontend 10.346 y falta de hash documentada anteriormente. Sin nueva prueba de descarga autenticada ni conciliación criptográfica. **Pendiente.**
+- **BF-AUD-004/005/008:** HTML no confiable, clasificación directa y marca de carga prematura; frontend SIGI 10.346 no se ha actualizado. **Pendientes, sin retest interactivo.**
+- **BF-AUD-009/010:** Edge \`asistencia-docente-v17-core\` permanece versión 2; riesgos de consulta por requestId y validación QR sin corrección certificada. **Pendientes.**
+- **BF-AUD-011/013:** ocho HTTP 409 de núcleo de Asistencia; ocho eventos \`ATTENDANCE_ERROR\` (4 \`OFFLINE_CAPTURE_EXPIRED\`, 3 \`OUTSIDE_GEOFENCE\`, 1 \`GPS_PRECISION_TOO_LOW\`). No se observó \`DEVICE_NOT_LINKED\` ni \`OFFLINE_STATE_CONFLICT\` en esta ventana; no implica corrección.
+- **HTTP:** API 3012×200, 3×201, 11×204, 12×400 (8 marcación, 4 kiosco); Edge 1594×200, 174×204, 10×400 (recordatorios), 8×409. Sin 5xx observados. PostgreSQL: 12×P0001, 1×23514.
+- **Seguridad:** 41 avisos \`rls_enabled_no_policy\` (antes 40), incluida tabla de envíos de recordatorios con RLS y sin SELECT para anon/auth; revisar sin abrir permisos indiscriminadamente. Funciones de alertas listar/resolver/sincronizar ejecutables solo por service_role.
+- **Actas/RAI:** 13 rutas activas, 9 políticas de Verificación NULL; no hubo E2E de actas, remisiones, firmas, Storage, Auth o roles. Los datos agregados históricos de documentos no fueron recalculados.
+- **Pruebas ejecutadas:** PASS de inspección de despliegues, restricciones actuales, permisos RLS de recordatorios, contadores agregados y firmas de RPC; FAIL estático de trazabilidad de resolución y control de errores de estado de envío; FAIL operativo de pruebas push; NO EJECUTADAS pruebas de componentes en navegador, integración autenticada y E2E por falta de sesiones/entorno aislado.
+- **Regla prioritaria:** preservar/persistir el borrador de fase antes de cualquier re-render; verificar después que \`verifPlan\`, \`verifInforme\` y los otros cuatro campos siguen cargados. No dar por corregido sin E2E autenticada.
