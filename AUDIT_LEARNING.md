@@ -268,3 +268,33 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Actas/RAI:** 13 rutas activas, 9 políticas de Verificación NULL; no hubo E2E de actas, remisiones, firmas, Storage, Auth o roles. Los datos agregados históricos de documentos no fueron recalculados.
 - **Pruebas ejecutadas:** PASS de inspección de despliegues, restricciones actuales, permisos RLS de recordatorios, contadores agregados y firmas de RPC; FAIL estático de trazabilidad de resolución y control de errores de estado de envío; FAIL operativo de pruebas push; NO EJECUTADAS pruebas de componentes en navegador, integración autenticada y E2E por falta de sesiones/entorno aislado.
 - **Regla prioritaria:** preservar/persistir el borrador de fase antes de cualquier re-render; verificar después que \`verifPlan\`, \`verifInforme\` y los otros cuatro campos siguen cargados. No dar por corregido sin E2E autenticada.
+
+
+## Auditoría 2026-11-01
+
+**Alcance y evidencia:** lectura de despliegue Vercel SIGI-IEM, Supabase \`SIGI-IEM-DEV\`, código de Edge Functions, restricciones SQL, contadores institucionales y logs del 2026-10-31 00:57 al 2026-11-01 00:57 (America/Bogotá). Sin modificaciones en producción ni datos de expedientes. **Versión SIGI-IEM:** último despliegue READY del 20-oct (10.346), sin nuevo despliegue encontrado. **Backend:** ACTIVE_HEALTHY, 597 migraciones; cron de recordatorios versión 5.
+
+### BF-AUD-022 — Éxito de cron sin comprobación de entrega
+- **Estado:** NUEVO patrón de observabilidad; **severidad media-alta**, no es prueba de pérdida efectiva de mensajes.
+- **Evidencia:** 1.438 respuestas HTTP 200 de \`asistencia-recordatorios-cron\` en 24 h, pero el último \`sent_at\` en \`asistencia_recordatorios_envios\` continúa en 2026-10-29 18:05:02 UTC. Hay 13 registros SENT, ninguno PENDING y siete suscripciones habilitadas. El 31-oct fue sábado; podría no haber destinatarios elegibles. La incompatibilidad del código \`kind.toLowerCase()\` (produce \`entrada/salida\`) frente al constraint SQL (\`entry/exit\`) **sigue presente**; no se ha corregido ni probado el camino de envío elegible.
+- **Señal temprana:** alto porcentaje de HTTP 200 pero contador de mensajes SENT inmóvil y ausencia de comprobación de destinatarios elegibles.
+- **Comprobación preventiva:** probar con un destinatario sintético elegible de entrada y salida, inspeccionar \`claim\`, registro y recepción, además de ejecución sin destinatarios.
+- **Regla:** medir separadamente ejecuciones de cron, destinatarios elegibles, mensajes reclamados, aceptados por push, marcados SENT y recibidos; HTTP 200 no acredita entrega.
+
+### BF-AUD-023 — Reaparición de HTTP 401 en funciones institucionales
+- **Estado:** RECURRENTE (eventos similares el 28-oct), **severidad media-alta**, causa sin confirmar.
+- **Evidencia:** ocho HTTP 401 de PostgREST: cinco \`es_coordinador_academico_funcional\`, dos \`periodos_academicos\` y uno \`remisiones_recibidas_v2\` durante la ventana. No hay pruebas autenticadas que permitan distinguir token vencido, cabecera faltante, sesión no renovada o permisos.
+- **Señal temprana:** errores 401 concentrados al entrar en módulos académicos/remisiones o tras reanudar la aplicación.
+- **Comprobación preventiva:** prueba por rol de sesión vigente, token vencido, renovación, navegación y acceso denegado intencional.
+- **Regla:** correlacionar 401 con estado de Auth y rol antes de cambiar GRANT o RLS; nunca abrir permisos para ocultar errores de sesión.
+
+### Seguimiento de hallazgos previos
+- **BF-AUD-020:** pendiente crítico de integración. \`asistencia-recordatorios-cron\` v5 sigue insertando \`kind.toLowerCase()\`, pero \`asistencia_recordatorios_envios_kind_check\` acepta exclusivamente \`entry/exit\`. En esta ventana no hubo HTTP 500 del cron; esto no demuestra corrección porque no se observó un nuevo registro SENT.
+- **BF-AUD-001:** cinco borradores de VERIFICACION; cuatro con \`verifPlan\` no vacío, tres con \`verifInforme\`; los cinco contienen las seis claves. **No ejecutada** prueba de re-render después de compromiso, actuación, evidencia o modal; preservar/persistir antes y comparar después.
+- **BF-AUD-002:** 14 borradores (6 DECISION, 3 VALORACION, 5 VERIFICACION), ninguno con \`version>1\`. RPC antiguas y v2 continúan ejecutables por \`authenticated\`. Concurrencia E2E pendiente.
+- **BF-AUD-003:** ocho anexos activos, todos con objeto en Storage y sin hash SHA-256. Registro verificado existe; uso completo por frontend no certificado.
+- **Rutas y documentos:** 13 rutas RAI activas, 9 con política NULL; 160 fuentes documentales, 16 remisiones, cero solicitudes de firma electrónica. Sin cambios observados respecto a revisión anterior.
+- **Seguridad:** 41 avisos informativos de RLS sin políticas, no equivalen automáticamente a vulnerabilidad. Revisar accesos efectivos sin ampliar privilegios indiscriminadamente.
+- **HTTP 24 h:** API 2.988×200 y 8×401; Edge Functions 1.451×200 y 11×204, sin 5xx en esta ventana. PostgreSQL: ocho 42501, un 42703 y un 08006; causa concreta de esos códigos no determinada.
+- **Pruebas ejecutadas:** PASS de consulta de despliegue, salud del proyecto, definición de constraint, contadores agregados, correspondencia Storage y presencia de campos; FAIL estático de contrato \`kind\` frente a SQL y de comprobación de errores de \`markSent\`; **NO EJECUTADAS** pruebas de componentes en navegador, integración autenticada, entrega push y E2E por rol por falta de sesiones/entorno aislado.
+- **Regla de publicación:** no declarar corregidos los hallazgos por ausencia de errores HTTP. Exigir pruebas autenticadas, datos sintéticos y evidencia de retest.
