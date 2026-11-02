@@ -298,3 +298,27 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **HTTP 24 h:** API 2.988×200 y 8×401; Edge Functions 1.451×200 y 11×204, sin 5xx en esta ventana. PostgreSQL: ocho 42501, un 42703 y un 08006; causa concreta de esos códigos no determinada.
 - **Pruebas ejecutadas:** PASS de consulta de despliegue, salud del proyecto, definición de constraint, contadores agregados, correspondencia Storage y presencia de campos; FAIL estático de contrato \`kind\` frente a SQL y de comprobación de errores de \`markSent\`; **NO EJECUTADAS** pruebas de componentes en navegador, integración autenticada, entrega push y E2E por rol por falta de sesiones/entorno aislado.
 - **Regla de publicación:** no declarar corregidos los hallazgos por ausencia de errores HTTP. Exigir pruebas autenticadas, datos sintéticos y evidencia de retest.
+
+
+## Auditoría 2026-11-02
+
+**Alcance:** revisión de solo lectura de Vercel, Supabase `SIGI-IEM-DEV`, definiciones de Edge Functions, restricciones SQL, contadores de expedientes y Storage, y logs del 2026-11-01 01:00 al 2026-11-02 00:59 (America/Bogotá). No se hicieron escrituras de expedientes ni pruebas autenticadas por rol. No se identificó un despliegue nuevo de SIGI-IEM: el último es `dpl_HgztrjeM1faan4zv2SeYtsX4D6qF`, READY, publicado el 20-oct. La Edge Function de recordatorios permanece en versión 5.
+
+### BF-AUD-024 — Ausencia de errores durante un día sin envíos no certifica reparación
+- **Estado:** nuevo patrón de aprendizaje; no es un defecto adicional confirmado. **Prioridad:** alta para prevención de falsa aprobación.
+- **Evidencia:** en 24 horas hubo 1.438 HTTP 200 y cinco HTTP 204 de Edge Functions, y 2.879 HTTP 200 de API; no se observaron 4xx/5xx en esas fuentes. Sin embargo, `asistencia-recordatorios-cron` v5 sigue insertando `kind:kind.toLowerCase()` (ENTRADA/SALIDA se vuelven entrada/salida), mientras `asistencia_recordatorios_envios_kind_check` admite solo `entry/exit`. La tabla de envíos conserva 13 SENT, último `sent_at` 2026-10-29 18:05:02 UTC, cero envíos desde 30-oct. Siete suscripciones habilitadas. La ventana incluye domingo; no se demostró que hubiera destinatarios elegibles.
+- **Señal temprana:** cron 200, ningún envío reciente y una incompatibilidad de contrato aún visible en código.
+- **Comprobación preventiva:** prueba sintética elegible para ENTRADA y SALIDA, validación del insert, respuesta del proveedor, persistencia SENT y recepción, más prueba sin destinatarios y con fallo simulado.
+- **Regla:** la ausencia de errores en periodos sin tráfico funcional no autoriza cerrar un defecto; verificar explícitamente el camino que lo activa, antes de reanudar actividad regular.
+
+### Hallazgos recurrentes y estado de pruebas
+- **BF-AUD-020, ALTA — recordatorios:** incompatibilidad SQL ↔ Edge Function confirmada nuevamente mediante inspección de código y constraint; **FAIL estático**. No se observó nueva ejecución fallida, pero el fallo previo sigue sin corrección demostrada. `markSent` y `release` no inspeccionan el resultado de actualización/borrado: **FAIL estático** de manejo de errores. No modificar la restricción sin revisar consumidores.
+- **BF-AUD-009, ALTA — autorización de marcaciones:** `asistencia-docente-v17-core` v2 conserva la rama `verify(requestId)` que consulta `asistencia_verificar_request` sin exigir `deviceToken`; **FAIL estático**, explotación no ensayada.
+- **BF-AUD-010, MEDIA-ALTA — QR:** `markQr` solo refleja presencia de `qrToken` en metadatos; **FAIL estático** respecto a verificación de autenticidad, condicionada a que QR acredite presencia.
+- **BF-AUD-002, ALTA — concurrencia:** 14 borradores, cero con versión mayor que 1; v2 existe, pero migración del consumidor publicado sin certificar. Prueba de dos sesiones NO EJECUTADA.
+- **BF-AUD-001, ALTA — re-render:** cinco borradores VERIFICACION, cuatro con Plan y tres con Síntesis/Informe; las seis claves están presentes en todos y ninguno se actualizó en la ventana. No prueba pérdida ni conservación tras acciones secundarias. E2E NO EJECUTADA. Preservar/persistir antes de compromisos, actuaciones, evidencias, modales o re-render; restaurar y comparar los seis campos después.
+- **BF-AUD-003, ALTA — evidencias:** ocho anexos activos, ocho objetos coincidentes en Storage, ocho sin hash; descarga por rol e integridad criptográfica NO EJECUTADAS.
+- **RAI y trazabilidad:** trece rutas activas, nueve con `verification_policy=NULL`; 160 fuentes documentales, 16 remisiones, cero solicitudes de firma; 597 migraciones. NULL no demuestra omisión de Verificación.
+- **Seguridad RLS:** 166 tablas de public con RLS y 308 políticas public (conteo estructural; no es certificación de permisos).
+- **Cobertura:** PASS de lectura de despliegue, existencia de RPC, definición de constraints, estructura JSON de seis claves, existencia de objetos Storage y agregados SQL. FAIL estático en contrato cron, comprobación de `markSent`, autorización por requestId y autenticidad QR. NO EJECUTADAS pruebas de componentes dinámicas, integración autenticada, recepción push, RLS por rol y E2E de fases/actas/evidencias/remisiones/cierre por falta de sesiones y entorno sintético aislado.
+- **Estado final:** cero defectos nuevos de producción demostrados en esta ventana; cero correcciones nuevas certificadas; hallazgos altos recurrentes pendientes. No declarar reparado por HTTP 200 o ausencia de errores.
