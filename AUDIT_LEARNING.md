@@ -322,3 +322,16 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Seguridad RLS:** 166 tablas de public con RLS y 308 políticas public (conteo estructural; no es certificación de permisos).
 - **Cobertura:** PASS de lectura de despliegue, existencia de RPC, definición de constraints, estructura JSON de seis claves, existencia de objetos Storage y agregados SQL. FAIL estático en contrato cron, comprobación de `markSent`, autorización por requestId y autenticidad QR. NO EJECUTADAS pruebas de componentes dinámicas, integración autenticada, recepción push, RLS por rol y E2E de fases/actas/evidencias/remisiones/cierre por falta de sesiones y entorno sintético aislado.
 - **Estado final:** cero defectos nuevos de producción demostrados en esta ventana; cero correcciones nuevas certificadas; hallazgos altos recurrentes pendientes. No declarar reparado por HTTP 200 o ausencia de errores.
+
+
+## Auditoría 2026-11-03 — BF-AUD-025: recurrencia de error de contrato en día hábil
+- **Estado:** recurrente, confirmado en logs y código activo; corrección pendiente. **Severidad:** alta.
+- **Evidencia:** 60 registros SMART_REMINDER_CRON_ERROR entre 2026-11-02 12:25:02 y 13:44:00 UTC; violación de asistencia_recordatorios_envios_kind_check. Edge Function asistencia-recordatorios-cron versión 5 usa kind.toLowerCase() para ENTRADA/SALIDA, mientras la tabla contiene tipos entry/exit. No hubo corrección certificada.
+- **Módulo:** Asistencia / recordatorios inteligentes / integración Edge Function ↔ PostgreSQL.
+- **Causa raíz:** contrato de enumeración no alineado entre productor y restricción de datos.
+- **Impacto:** ciclos elegibles de recordatorios fallan; posible ausencia de avisos de entrada o salida.
+- **Señal temprana:** SMART_REMINDER_CRON_ERROR con check constraint y fallos concentrados en horas de jornada; respuestas HTTP 200 en otros ciclos no descartan el fallo.
+- **Prevención:** pruebas de contrato con eventos ENTRADA/SALIDA y restricciones reales, en entorno aislado, antes de publicar; alarma por recurrencia de SQLSTATE 23514.
+- **Regla:** todo enum transmitido entre módulos debe tener conversión explícita y prueba positiva/negativa de persistencia; nunca usar toLowerCase() como conversión de idioma.
+- **Prueba mínima:** destinatarios sintéticos elegibles para entrada y salida, claim con entry/exit, envío y estado final, sin duplicación en reintentos; probar rechazo controlado.
+- **Limitaciones:** sin E2E autenticada por rol; sin modificación de producción. El patrón BF-AUD-001 de pérdida de borrador por re-render permanece obligatorio y sin certificación E2E.
