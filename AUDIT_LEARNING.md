@@ -335,3 +335,17 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Regla:** todo enum transmitido entre módulos debe tener conversión explícita y prueba positiva/negativa de persistencia; nunca usar toLowerCase() como conversión de idioma.
 - **Prueba mínima:** destinatarios sintéticos elegibles para entrada y salida, claim con entry/exit, envío y estado final, sin duplicación en reintentos; probar rechazo controlado.
 - **Limitaciones:** sin E2E autenticada por rol; sin modificación de producción. El patrón BF-AUD-001 de pérdida de borrador por re-render permanece obligatorio y sin certificación E2E.
+
+
+## Auditoría 2026-11-04 — BF-AUD-026: ausencia de envíos no equivale a corrección del cron
+- **Estado:** recurrente y pendiente; ninguna corrección certificada. **Severidad:** alta por afectación potencial de avisos de asistencia.
+- **Evidencia nueva de solo lectura:** despliegue SIGI-IEM staging READY sin publicación posterior al 20 de octubre; Supabase ACTIVE_HEALTHY; función asistencia-recordatorios-cron versión 5 ACTIVE, con `claim()` que persiste `kind:kind.toLowerCase()`; tabla de envíos con 13 registros y último `sent_at=2026-10-29 18:05:02.698+00`. La auditoría previa confirmó 60 errores el 2 de noviembre. En esta ventana no se reprodujo un envío sintético.
+- **Módulo:** recordatorios / Edge Function ↔ PostgreSQL.
+- **Causa probable persistente:** traducción incorrecta de ENTRADA/SALIDA a entrada/salida en lugar del contrato histórico entry/exit. Validar de nuevo la restricción exacta antes de aplicar cambios.
+- **Impacto:** posibles recordatorios elegibles no registrados; no se infiere número de destinatarios afectados a partir del contador de errores.
+- **Señal temprana:** cron activo y registros HTTP exitosos, pero contador de envíos sin aumentar en días hábiles; buscar también errores 23514.
+- **Comprobación preventiva:** prueba de contrato con suscriptor sintético elegible para ENTRADA y SALIDA, persistencia y recepción, con reintento idempotente.
+- **Regla reutilizable:** estado ACTIVE/READY y HTTP 200 no prueban una operación de negocio; contrastar código, restricción, registro persistido y entrega real.
+- **Pruebas:** PASS de lectura de despliegue, función y agregados de tabla; FAIL estático en conversión de tipos; NO EJECUTADAS pruebas de componente interactivas, integración con escritura y E2E autenticada por rol.
+- **BF-AUD-001, regresión obligatoria:** antes de re-renderizar Verificación preservar o persistir Plan, Síntesis/Informe, hechos verificados/no verificados, versiones/actuaciones y soportes; después de compromiso, actuación, evidencia y modal comparar los seis valores, recargar y comprobar recuperación. NO EJECUTADA por ausencia de sesión sintética aislada.
+- **Otros pendientes históricos:** concurrencia de borradores mediante RPC v2, evidencias y Storage, autorización por requestId, QR, HTML, clasificación, derivación, alertas, RLS y actas; no declarar corrección por falta de reproducción.
