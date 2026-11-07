@@ -349,3 +349,19 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Pruebas:** PASS de lectura de despliegue, función y agregados de tabla; FAIL estático en conversión de tipos; NO EJECUTADAS pruebas de componente interactivas, integración con escritura y E2E autenticada por rol.
 - **BF-AUD-001, regresión obligatoria:** antes de re-renderizar Verificación preservar o persistir Plan, Síntesis/Informe, hechos verificados/no verificados, versiones/actuaciones y soportes; después de compromiso, actuación, evidencia y modal comparar los seis valores, recargar y comprobar recuperación. NO EJECUTADA por ausencia de sesión sintética aislada.
 - **Otros pendientes históricos:** concurrencia de borradores mediante RPC v2, evidencias y Storage, autorización por requestId, QR, HTML, clasificación, derivación, alertas, RLS y actas; no declarar corrección por falta de reproducción.
+
+
+## Auditoría 2026-11-07 — BF-AUD-029: contrato roto y estado de envío no verificado
+
+- **Estado:** recurrente confirmado estáticamente, sin corrección certificada. **Severidad:** alta en recordatorios; media-alta en trazabilidad del envío.
+- **Evidencia directa:** Edge Function `asistencia-recordatorios-cron` ACTIVE v5 mantiene `kind:kind.toLowerCase()` en `claim`, mientras `asistencia_recordatorios_envios_kind_check` admite exclusivamente `entry` y `exit`. Tabla de envíos: 13 registros, último `sent_at` 2026-10-29 18:05:02.698 UTC. Despliegue más reciente encontrado de `sigi-iem-staging`: 2026-10-20, READY.
+- **Causa raíz:** traducción de enumeración incompatible. `markSent` y `release` no comprueban `error` ni filas afectadas en sus operaciones Supabase.
+- **Impacto:** rechazo de registros elegibles; posibles estados de notificación no persistidos. No inferir cuántas personas fueron afectadas sin correlación.
+- **Corrección recomendada:** mapeo explícito `ENTRADA -> entry`, `SALIDA -> exit` con prueba de contrato; comprobar escrituras y reintentos idempotentes. No cambiar constraint sin inventario de consumidores.
+- **Prueba mínima:** suscriptor sintético elegible para entrada y salida, insertar/confirmar envío/recibir, inyectar fallo posterior a envío, comprobar recuperación y no duplicación.
+- **Patrón y señal temprana:** cron ACTIVE/HTTP 200 con `SENT` inmóvil; conversión de enums sin prueba de esquema; escritura que ignora `error`.
+- **Prevención:** test automatizado de enum entre función y constraint, test de resultado persistido y reconciliación de estado con envío real.
+- **Regla reutilizable:** no certificar una integración por estado de despliegue o ejecución; exigir contrato, operación, persistencia, recuperación y observabilidad.
+- **Cobertura:** PASS inspección de Edge Function v5, restricción SQL, agregado de envíos y despliegue; FAIL estático contrato de tipo y comprobación de errores; NO EJECUTADAS pruebas de componentes UI, integración con escrituras y E2E autenticadas por rol (sin sesiones sintéticas ni entorno aislado). Logs disponibles consultados, sin clasificación fiable de nuevos errores por su contenido.
+- **BF-AUD-001 obligatorio:** preservar/persistir antes de re-render los seis campos de Verificación (Plan, Síntesis/Informe, hechos verificados/no verificados, versiones/actuaciones y soportes); comprobar valores tras compromiso, actuación, evidencia, modal, recarga y avance. No ejecutado; pendiente, no corregido.
+- **Pendientes históricos sin retest:** RPC v2/concurrencia, evidencias/Storage/hash, Auth/RLS, consulta por requestId, QR, HTML seguro, clasificación, derivación, actas, remisiones, roles y rutas RAI. No afirmar regresión nueva ni corrección sin pruebas.
