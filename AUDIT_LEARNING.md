@@ -365,3 +365,18 @@ Cada nuevo fallo debe registrar como mínimo: síntoma, módulo, severidad, caus
 - **Cobertura:** PASS inspección de Edge Function v5, restricción SQL, agregado de envíos y despliegue; FAIL estático contrato de tipo y comprobación de errores; NO EJECUTADAS pruebas de componentes UI, integración con escrituras y E2E autenticadas por rol (sin sesiones sintéticas ni entorno aislado). Logs disponibles consultados, sin clasificación fiable de nuevos errores por su contenido.
 - **BF-AUD-001 obligatorio:** preservar/persistir antes de re-render los seis campos de Verificación (Plan, Síntesis/Informe, hechos verificados/no verificados, versiones/actuaciones y soportes); comprobar valores tras compromiso, actuación, evidencia, modal, recarga y avance. No ejecutado; pendiente, no corregido.
 - **Pendientes históricos sin retest:** RPC v2/concurrencia, evidencias/Storage/hash, Auth/RLS, consulta por requestId, QR, HTML seguro, clasificación, derivación, actas, remisiones, roles y rutas RAI. No afirmar regresión nueva ni corrección sin pruebas.
+
+
+## Auditoría 2026-11-09 — BF-AUD-031: despliegue nuevo sin certificación funcional
+- **Estado:** nuevo hallazgo de despliegue; comportamiento de aplicación no certificado. **Severidad:** media preventiva.
+- **Evidencia:** Vercel registra despliegue READY dpl_5iowC4mKzaJQto1ANzkeNyM3Yu1W creado el 2026-11-07, posterior al despliegue production del 20 de octubre; target=null y sin alias en la respuesta. No asumir que reemplaza producción ni que es versión 10.346.
+- **Señal temprana:** auditorías que siguen citando una versión antigua sin consultar historial de despliegues o confunden READY con publicación en dominio oficial.
+- **Prevención:** comparar despliegues, target, alias, artefacto y pruebas por rol; confirmar dominio que atiende usuarios antes de declarar versión vigente.
+- **Regla:** READY certifica construcción/despliegue, no flujos E2E ni activación en producción.
+- **Prueba mínima:** obtener artefacto/versión y URL efectiva; verificar dominio de producción y ejecutar regresión autenticada de Verificación.
+
+## Seguimiento 2026-11-09 — BF-AUD-020, BF-AUD-029, BF-AUD-002 y BF-AUD-001
+- **Recordatorios:** Edge Function asistencia-recordatorios-cron sigue ACTIVE v5; claim usa kind.toLowerCase() para ENTRADA/SALIDA y markSent/release omiten verificar errores de escritura. La tabla conserva 13 envíos, último 2026-10-29 18:05:02 UTC. Pendiente corrección y prueba de envío elegible.
+- **Concurrencia:** 16 borradores en convivencia_borradores_fase; ninguno con version >1. Esto no demuestra sobrescritura, sí exige prueba de dos sesiones y auditoría de consumidores RPC.
+- **Verificación:** BF-AUD-001 continúa sin prueba E2E autenticada que demuestre preservación de Plan, Síntesis/Informe y otros campos tras compromiso, actuación, evidencia y modal. Mantener regresión obligatoria.
+- **Límites:** inspección estática y consultas de solo lectura; no se ejecutaron pruebas E2E ni escrituras sobre expedientes. No declarar correcciones verificadas.
